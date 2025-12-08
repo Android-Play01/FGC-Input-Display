@@ -399,6 +399,10 @@
   <label>Texto</label>
   <input type="text" id="editText" placeholder="Ej: LP" oninput="updateCurrentButton()">
 
+  <label>Es Macro de (separa con comas)</label>
+  <input type="text" id="editMacro" placeholder="Ej: LP, MP, HP" oninput="updateCurrentButton()">
+  <p style="font-size:11px; opacity:0.6; margin-top:-5px; margin-bottom:15px;">Al pulsar este botón, el Input Viewer mostrará los botones listados aquí.</p>
+
   <label>Tecla del teclado</label>
   <input type="text" id="editKey" placeholder="x" oninput="updateCurrentButton()">
 
@@ -460,6 +464,20 @@ const MAX_HISTORY = 19;
 let inputHistory = []; 
 inputHistory.push({ frames: 1, inputs: ['N'], id: Date.now() });
 
+// Lista de prioridades para ordenación (Direcciones siempre primero)
+// Se ha ampliado para incluir español y símbolos
+const DIRECTIONS = [
+    'UP', 'DOWN', 'LEFT', 'RIGHT', // English
+    'U', 'D', 'L', 'R', 'F', 'B', 'N', // Notation
+    '8', '2', '4', '6', '1', '3', '7', '9', // Numpad
+    'ARRIBA', 'ABAJO', 'IZQUIERDA', 'DERECHA', // Spanish
+    'ATRAS', 'ATRÁS', 'ADELANTE', // Spanish
+    '↖', '↑', '↗', '←', '→', '↙', '↓', '↘' // Arrows
+];
+
+// NUEVO: Rastrear cuándo se activó cada input para ordenar cronológicamente
+let inputActivationTimes = {}; 
+
 // Variables para Creación de Diagonales (Combos)
 let isComboLearning = false;
 let comboLearningStep = 0; // 0: inactivo, 1: esperando btn 1, 2: esperando btn 2
@@ -474,6 +492,7 @@ let viewerConfig = {
     customCombos: [] // Array de { id, keys: ['A','B'], url: '' }
 };
 let isDraggingViewer = false;
+let viewerWasDragged = false; 
 let viewerDragStart = { x: 0, y: 0 };
 
 // --- Inicialización y Eventos ---
@@ -585,31 +604,37 @@ requestAnimationFrame(gamepadLoop);
 // --- LÓGICA DEL INPUT VIEWER (SF6 REAL + CUSTOM COMBOS) ---
 
 function processInputViewerFrame(activeIds) {
-    // 1. Extraer Inputs Crudos
+    // 1. Extraer Inputs Crudos con Soporte de MACROS
     let rawInputs = [];
     activeIds.forEach(id => {
         const btn = elements.find(b => b.id === id);
-        if(btn) rawInputs.push(btn.text.toUpperCase());
+        if(btn) {
+            // Si el botón tiene una macro definida, usamos sus targets
+            if (btn.macro && btn.macro.trim() !== '') {
+                const targets = btn.macro.split(',').map(s => s.trim().toUpperCase());
+                rawInputs.push(...targets);
+            } else {
+                // Si no, usamos el texto del botón normal
+                rawInputs.push(btn.text.toUpperCase());
+            }
+        }
     });
 
-    // 2. Detectar Combos Personalizados (PETICIÓN 5)
-    let processedInputs = [];
-    let inputsToConsume = [...rawInputs]; // Copia para ir eliminando lo usado
+    // Eliminar duplicados
+    rawInputs = [...new Set(rawInputs)];
 
-    // Buscamos si hay combos activos definidos por el usuario
+    // 2. Detectar Combos Personalizados
+    let processedInputs = [];
+    let inputsToConsume = [...rawInputs]; 
+
     if (viewerConfig.customCombos && viewerConfig.customCombos.length > 0) {
         viewerConfig.customCombos.forEach(combo => {
             const key1 = combo.keys[0];
             const key2 = combo.keys[1];
             
-            // Verificamos si ambos inputs están presentes
             if (inputsToConsume.includes(key1) && inputsToConsume.includes(key2)) {
-                // Combo detectado!
-                // Añadimos un identificador especial para renderizar la imagen del combo
                 processedInputs.push(`COMBO_ID:${combo.id}`);
                 
-                // Eliminamos esos inputs de la lista para que no se dupliquen como singles
-                // Nota: Eliminamos solo una instancia de cada uno
                 const idx1 = inputsToConsume.indexOf(key1);
                 if (idx1 > -1) inputsToConsume.splice(idx1, 1);
                 
@@ -619,10 +644,25 @@ function processInputViewerFrame(activeIds) {
         });
     }
 
-    // Los inputs que sobraron (no formaron combo) se añaden tal cual
     processedInputs = [...processedInputs, ...inputsToConsume];
 
-    // 3. Determinar Estado Final
+    // --- NUEVO: GESTIÓN DE TIEMPOS DE ACTIVACIÓN ---
+    // a) Añadir tiempo a nuevos inputs
+    const now = Date.now();
+    processedInputs.forEach(input => {
+        if (!inputActivationTimes[input]) {
+            inputActivationTimes[input] = now;
+        }
+    });
+    
+    // b) Limpiar tiempos de inputs que ya no están
+    Object.keys(inputActivationTimes).forEach(key => {
+        if (!processedInputs.includes(key)) {
+            delete inputActivationTimes[key];
+        }
+    });
+
+    // 3. Determinar Estado Final y ORDENAR POR PRIORIDAD + TIEMPO
     let finalInputs = [];
     
     if (processedInputs.length === 0) {
@@ -631,8 +671,41 @@ function processInputViewerFrame(activeIds) {
         finalInputs = processedInputs;
     }
     
-    // Ordenar alfabéticamente para consistencia en la comparación
-    finalInputs.sort();
+    // ORDENACIÓN CUSTOM: 
+    // 1. Direcciones (arriba, abajo, etc) siempre primero.
+    // 2. Si ambos son direcciones o ambos NO son direcciones, ordenar por tiempo de llegada (Cronológico).
+    finalInputs.sort((a, b) => {
+        // Función helper para chequear si es dirección (directa O combo de direcciones)
+        const isDirection = (key) => {
+             if (DIRECTIONS.includes(key)) return true;
+             // Si es un combo, verificamos si está compuesto SOLO por direcciones
+             if (key.startsWith('COMBO_ID:')) {
+                 const id = parseInt(key.split(':')[1]);
+                 const combo = viewerConfig.customCombos.find(c => c.id === id);
+                 if (combo && combo.keys.every(k => DIRECTIONS.includes(k))) {
+                     return true;
+                 }
+             }
+             return false;
+        };
+
+        const isDirA = isDirection(a);
+        const isDirB = isDirection(b);
+        
+        // Prioridad absoluta a Direcciones
+        if (isDirA && !isDirB) return -1;
+        if (!isDirA && isDirB) return 1;
+        
+        // Si no son direcciones, ordenar por antigüedad (quién llegó primero)
+        if (!isDirA && !isDirB) {
+            const timeA = inputActivationTimes[a] || 0;
+            const timeB = inputActivationTimes[b] || 0;
+            if (timeA !== timeB) return timeA - timeB;
+        }
+
+        // Fallback: orden alfabético para estabilidad si los tiempos son idénticos
+        return a.localeCompare(b);
+    });
 
     const currentInputString = finalInputs.join('+');
     
@@ -644,11 +717,9 @@ function processInputViewerFrame(activeIds) {
         const topInputString = topEntry.inputs.join('+');
 
         if (currentInputString === topInputString) {
-            // MISMO INPUT: Incrementamos contador
             topEntry.frames++;
             updateTopRowDisplay(topEntry); 
         } else {
-            // NUEVO INPUT: Insertamos nueva fila
             const newEntry = { frames: 1, inputs: finalInputs, id: Date.now() };
             inputHistory.unshift(newEntry);
             if (inputHistory.length > MAX_HISTORY) inputHistory.pop();
@@ -676,19 +747,16 @@ function renderInputHistory() {
         const row = document.createElement('div');
         row.className = 'history-row';
         
-        // Frames
         const frames = document.createElement('div');
         frames.className = 'frame-count';
         frames.style.fontSize = viewerConfig.fontSize + 'px';
         frames.innerText = entry.frames > 99 ? '99+' : entry.frames;
         row.appendChild(frames);
         
-        // Inputs
         entry.inputs.forEach(inputKey => {
             const div = document.createElement('div');
             div.className = 'input-icon';
             
-            // Detectar si es un combo personalizado o un input normal
             if (inputKey.startsWith('COMBO_ID:')) {
                 const comboId = parseInt(inputKey.split(':')[1]);
                 const combo = viewerConfig.customCombos.find(c => c.id === comboId);
@@ -697,14 +765,12 @@ function renderInputHistory() {
                     img.src = combo.url;
                     div.appendChild(img);
                 } else {
-                    // Fallback visual si no hay URL
                     const span = document.createElement('div');
                     span.className = 'fallback-icon';
                     span.innerText = combo ? (combo.keys[0]+'+'+combo.keys[1]) : '?';
                     div.appendChild(span);
                 }
             } else {
-                // Input Normal (Botón o Neutral)
                 renderIconOrText(div, inputKey);
             }
             row.appendChild(div);
@@ -715,15 +781,12 @@ function renderInputHistory() {
 }
 
 function renderIconOrText(container, key) {
-    // Buscar URL en configuración (Ahora solo N y Ataques individuales tienen campos directos)
     const url = viewerConfig.urls[key];
-    
     if (url) {
         const img = document.createElement('img');
         img.src = url;
         container.appendChild(img);
     } else {
-        // Fallback texto
         const span = document.createElement('div');
         span.className = 'fallback-icon';
         span.innerText = key === 'N' ? '.' : key; 
@@ -736,6 +799,7 @@ function renderIconOrText(container, key) {
 
 function clickFab() {
     const panel = document.getElementById('rightPanel');
+    closeEditor();
     if (panel.classList.contains('open')) {
         switchRightTab('general');
     } else {
@@ -765,7 +829,6 @@ function updateBorderColor(val) {
     saveViewerConfig();
 }
 
-// PETICIÓN 2: Fondo cambiable
 function updateViewerBg(val) {
     viewerConfig.backgroundColor = val;
     document.getElementById('inputDisplayContainer').style.background = val;
@@ -779,14 +842,12 @@ function startComboLearning() {
     comboLearningStep = 1;
     tempComboKeys = [];
     showToast("MODO COMBOS: Pulsa el PRIMER botón en la pantalla.");
-    // Cerramos paneles para facilitar la selección
     closeRightPanel();
 }
 
 function handleComboSelection(btn) {
     if (!isComboLearning) return false;
     
-    // Evitar duplicados si pulsan el mismo dos veces
     if (comboLearningStep === 2 && tempComboKeys[0] === btn.text.toUpperCase()) {
         showToast("Elige un botón distinto.");
         return true;
@@ -798,7 +859,6 @@ function handleComboSelection(btn) {
         comboLearningStep = 2;
         showToast(`Botón 1: ${btn.text}. Pulsa el SEGUNDO botón.`);
     } else if (comboLearningStep === 2) {
-        // Combo completado
         const newCombo = {
             id: Date.now(),
             keys: tempComboKeys,
@@ -810,15 +870,12 @@ function handleComboSelection(btn) {
         
         showToast(`Diagonal creada: ${tempComboKeys.join(" + ")}`);
         
-        // Reset y volver al panel
         isComboLearning = false;
         comboLearningStep = 0;
         
-        // Abrir panel para poner la URL
         document.getElementById('rightPanel').classList.add('open');
         switchRightTab('viewer');
         
-        // Scrollear al fondo
         setTimeout(() => {
             const container = document.getElementById('customCombosContainer');
             container.lastElementChild?.scrollIntoView({ behavior: 'smooth' });
@@ -826,7 +883,7 @@ function handleComboSelection(btn) {
         }, 100);
     }
     
-    return true; // Indica que se consumió el click
+    return true; 
 }
 
 function renderCustomCombosList() {
@@ -877,13 +934,12 @@ function deleteCombo(index) {
 // --- Funciones UI del Editor ---
 
 function openEditor(btn = null) {
-  const wasPanelOpen = document.getElementById('leftPanel').classList.contains('open');
   selectedBtn = btn;
   updateLearningButtonUI();
   document.querySelectorAll('.input-btn').forEach(el => el.classList.remove('editing'));
+  
   document.getElementById('leftPanel').classList.add('open');
-  document.getElementById('rightPanel').classList.add('open');
-  switchRightTab('viewer'); 
+  closeRightPanel(); 
 
   if (btn) {
     const el = document.querySelector(`[data-id="${btn.id}"]`);
@@ -895,6 +951,7 @@ function openEditor(btn = null) {
     document.getElementById('colorActive').value = btn.colorActive || '#7c4dff';
     document.getElementById('editStyle').value = btn.style || 'glass';
     document.getElementById('editClickEffect').value = btn.clickEffect || 'down';
+    document.getElementById('editMacro').value = btn.macro || '';
     updateGamepadStatusText(btn.gamepadMap);
   } else {
     document.getElementById('editText').value = 'LP';
@@ -904,6 +961,7 @@ function openEditor(btn = null) {
     document.getElementById('colorActive').value = '#7c4dff';
     document.getElementById('editStyle').value = 'glass';
     document.getElementById('editClickEffect').value = 'down';
+    document.getElementById('editMacro').value = '';
     updateGamepadStatusText(null);
   }
 }
@@ -929,6 +987,7 @@ function addNewButton() {
     colorActive: '#7c4dff',
     style: 'glass',
     clickEffect: 'down',
+    macro: '', 
     gamepadMap: null
   };
   elements.push(newBtn);
@@ -947,6 +1006,7 @@ function updateCurrentButton() {
   selectedBtn.colorActive = document.getElementById('colorActive').value;
   selectedBtn.style = document.getElementById('editStyle').value;
   selectedBtn.clickEffect = document.getElementById('editClickEffect').value;
+  selectedBtn.macro = document.getElementById('editMacro').value; 
   updateButtonVisual(selectedBtn);
   refreshAttackInputs();
   saveToStorage();
@@ -1021,7 +1081,7 @@ function startDrag(e, btn) {
   // INTERCEPCIÓN PARA APRENDIZAJE DE COMBOS
   if (isComboLearning) {
       handleComboSelection(btn);
-      return; // No arrastramos si estamos seleccionando para combo
+      return; 
   }
 
   const wasPanelOpen = document.getElementById('leftPanel').classList.contains('open');
@@ -1037,6 +1097,7 @@ const viewerEl = document.getElementById('inputDisplayContainer');
 viewerEl.onmousedown = (e) => {
     if(e.button !== 0) return;
     isDraggingViewer = true;
+    viewerWasDragged = false; 
     viewerDragStart = { x: e.clientX - viewerEl.offsetLeft, y: e.clientY - viewerEl.offsetTop };
     e.stopPropagation();
 };
@@ -1081,6 +1142,7 @@ document.onmousemove = (e) => {
     }
   }
   if (isDraggingViewer) {
+      viewerWasDragged = true; 
       const nx = e.clientX - viewerDragStart.x;
       const ny = e.clientY - viewerDragStart.y;
       viewerEl.style.left = nx + 'px';
@@ -1110,16 +1172,30 @@ document.onmousemove = (e) => {
 
 function endDrag(e, btn) {
     if (isPotentialDrag) {
-        if (!isDragging && !document.getElementById('leftPanel').classList.contains('open')) {
-          openEditor(btn);
-        } else if (isDragging) { saveToStorage(); }
+        if (!isDragging) {
+           openEditor(btn); 
+        } else if (isDragging) { 
+           saveToStorage(); 
+        }
     }
     isPotentialDrag = false; isDragging = false;
 }
 
 document.onmouseup = () => {
   if (isDragging) { isDragging = false; saveToStorage(); }
-  if (isDraggingViewer) { isDraggingViewer = false; saveViewerConfig(); }
+  
+  if (isDraggingViewer) { 
+      isDraggingViewer = false;
+      
+      if (!viewerWasDragged) {
+          closeEditor(); 
+          document.getElementById('rightPanel').classList.add('open');
+          switchRightTab('viewer');
+      }
+      
+      saveViewerConfig(); 
+  }
+  
   isPotentialDrag = false;
   if (isSelecting) {
     isSelecting = false;
@@ -1202,7 +1278,6 @@ function saveViewerConfig() {
     viewerConfig.fontSize = parseInt(document.getElementById('viewerFontSize').value) || 12;
     viewerConfig.urls['N'] = document.getElementById('url_N').value;
     
-    // Guardar URLs de ataques individuales
     document.querySelectorAll('.custom-url-input').forEach(inp => {
         viewerConfig.urls[inp.dataset.key] = inp.value;
     });
@@ -1212,7 +1287,6 @@ function saveViewerConfig() {
 }
 
 function loadViewerConfig(configOverride = null) {
-    // Si viene config por parámetro (importación), úsalo. Si no, lee de localStorage.
     let data = configOverride;
     
     if (!data) {
@@ -1225,14 +1299,12 @@ function loadViewerConfig(configOverride = null) {
     if(data) {
         viewerConfig = { ...viewerConfig, ...data };
         
-        // Aplicar estilos
         const el = document.getElementById('inputDisplayContainer');
         el.style.left = viewerConfig.x + 'px';
         el.style.top = viewerConfig.y + 'px';
         el.style.borderLeftColor = viewerConfig.borderColor || '#7c4dff';
         el.style.background = viewerConfig.backgroundColor || 'rgba(0, 0, 0, 0.85)';
 
-        // Rellenar Inputs Panel
         document.getElementById('viewerFontSize').value = viewerConfig.fontSize;
         document.getElementById('viewerBorderColorPicker').value = viewerConfig.borderColor;
         document.getElementById('viewerBorderColorText').value = viewerConfig.borderColor;
@@ -1242,7 +1314,6 @@ function loadViewerConfig(configOverride = null) {
         const nInput = document.getElementById('url_N');
         if(nInput) nInput.value = viewerConfig.urls['N'] || '';
         
-        // Renderizar lista de combos si hay
         renderCustomCombosList();
         refreshAttackInputs();
     } else {
@@ -1265,7 +1336,6 @@ function refreshAttackInputs() {
     const uniqueTexts = new Set();
     elements.forEach(btn => {
         const t = btn.text.toUpperCase();
-        // Filtramos N, y ahora N es la unica reservada. 
         if(t !== 'N' && t.length > 0) uniqueTexts.add(t);
     });
     
@@ -1307,7 +1377,6 @@ document.getElementById('importInput').addEventListener('keydown', function(e) {
       const data = JSON.parse(str);
       if (!data.elements) throw new Error('Formato inválido');
       
-      // Cargar Botones y Fondo Global
       document.body.style.background = data.bg || 'transparent';
       document.getElementById('bgInput').value = data.bg || 'transparent';
       elements = data.elements || [];
@@ -1315,7 +1384,6 @@ document.getElementById('importInput').addEventListener('keydown', function(e) {
       elements.forEach(renderButton);
       saveToStorage();
 
-      // PETICIÓN 5: Importar Config Viewer tambien
       if (data.viewerConfig) {
           loadViewerConfig(data.viewerConfig);
           saveViewerConfig();
@@ -1331,7 +1399,6 @@ document.getElementById('importInput').addEventListener('keydown', function(e) {
 });
 
 function exportConfig() {
-  // PETICIÓN 5: Incluir configuración del viewer en la exportación
   const data = { 
       bg: document.body.style.background, 
       elements,
@@ -1350,9 +1417,8 @@ function clearAll() {
       viewerConfig.customCombos = [];
       closeEditor();
       window.clearAllConfirmed = false; showToast('🗑️ ¡Borrado completo!');
-      // Reset visual
       resetViewerPos();
-      loadViewerConfig(); // Recarga defaults
+      loadViewerConfig(); 
   } else { window.clearAllConfirmed = true; setTimeout(() => window.clearAllConfirmed = false, 3000); }
 }
 
