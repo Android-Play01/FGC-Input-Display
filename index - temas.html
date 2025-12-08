@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>FGC Input Display • Editor Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  :root {
+    --accent: #7c4dff;
+    --warning: #ffab00;
+    --success: #00e676;
+    --panel-bg: rgba(10,10,25,0.98);
+    --tab-bg: #222;
+    --tab-active: #7c4dff;
+  }
+  body {
+    margin: 0;
+    height: 100vh;
+    background: #000;
+    overflow: hidden;
+    font-family: 'Segoe UI', sans-serif;
+    color: white;
+    user-select: none;
+  }
+  #canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* --- BOTONES CIRCULARES (BASE) --- */
+  .input-btn {
+    position: absolute;
+    border-radius: 50%;
+    /* Variables CSS dinámicas que se llenan con JS */
+    --btn-color: #1e1e32;
+    --btn-border: #7c4dff;
+    
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 18px;
+    color: white;
+    cursor: grab;
+    z-index: 10;
+    transition: transform 0.05s, box-shadow 0.1s, background 0.1s, border-color 0.1s;
+    /* Valores por defecto */
+    background: var(--btn-color);
+    border: 3px solid var(--btn-border);
+  }
+
+  .input-btn:active { cursor: grabbing; }
+
+  /* --- TEMAS / SKINS CSS --- */
+
+  /* 1. GLASS (Original) */
+  .input-btn.style-glass {
+    background: var(--btn-color);
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-color: var(--btn-border);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+    backdrop-filter: blur(10px);
+  }
+  .input-btn.style-glass.active {
+    box-shadow: 0 0 30px var(--btn-border);
+  }
+
+  /* 2. NEON HOLLOW (Cyberpunk) */
+  .input-btn.style-neon {
+    background: rgba(0,0,0,0.6) !important; /* Fondo siempre oscuro */
+    border: 3px solid var(--btn-border);
+    box-shadow: 0 0 10px var(--btn-border), inset 0 0 10px var(--btn-border);
+    color: var(--btn-border);
+    text-shadow: 0 0 5px var(--btn-border);
+  }
+  .input-btn.style-neon.active {
+    background: var(--btn-border) !important;
+    color: #000;
+    box-shadow: 0 0 40px var(--btn-border);
+    text-shadow: none;
+    transform: scale(0.95);
+  }
+
+  /* 3. METALLIC GEL (Premium/KOF) */
+  .input-btn.style-metal {
+    /* Gradiente metálico en el borde */
+    border: 4px solid #888; 
+    border-top-color: #ccc;
+    border-bottom-color: #444;
+    /* Efecto gel interior */
+    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), transparent 60%), var(--btn-color);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.8), inset 0 0 10px rgba(0,0,0,0.5);
+  }
+  .input-btn.style-metal::after {
+    /* Brillo especular "Glossy" */
+    content: ''; position: absolute; top: 15%; left: 15%; width: 30%; height: 20%;
+    border-radius: 50%;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.8), transparent);
+    filter: blur(1px);
+  }
+  .input-btn.style-metal.active {
+    background: radial-gradient(circle, #fff, var(--btn-border));
+    box-shadow: 0 0 20px var(--btn-border), inset 0 0 20px #000;
+    border-color: #fff;
+    transform: scale(0.95);
+  }
+
+  /* 4. ARCADE SOLID (Sanwa Style) */
+  .input-btn.style-arcade {
+    background: linear-gradient(145deg, var(--btn-color), #000);
+    border: 4px solid rgba(0,0,0,0.3);
+    box-shadow: 5px 5px 10px rgba(0,0,0,0.5), inset 2px 2px 5px rgba(255,255,255,0.2);
+  }
+  /* Anillo exterior del botón arcade */
+  .input-btn.style-arcade::before {
+    content: ''; position: absolute; inset: -8px;
+    border-radius: 50%;
+    border: 2px solid #333;
+    z-index: -1;
+    background: #111;
+  }
+  .input-btn.style-arcade.active {
+    background: var(--btn-border);
+    transform: translateY(2px);
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+  }
+
+  /* 5. SOFT GLOW (Suave) */
+  .input-btn.style-soft {
+    background: var(--btn-color);
+    border: 2px solid rgba(255,255,255,0.5);
+    box-shadow: 0 0 25px var(--btn-color);
+  }
+  .input-btn.style-soft.active {
+    background: var(--btn-border);
+    box-shadow: 0 0 60px var(--btn-border);
+    transform: scale(1.1);
+  }
+
+  /* 6. MINIMALIST (Flat) */
+  .input-btn.style-plain {
+    background: transparent;
+    border: 2px solid rgba(255,255,255,0.2);
+    box-shadow: none;
+  }
+  .input-btn.style-plain.active {
+    background: var(--btn-border);
+    border-color: var(--btn-border);
+  }
+
+
+  /* --- Selección Múltiple --- */
+  .input-btn.selected-multi {
+    border-color: #fff !important;
+    box-shadow: 0 0 0 2px #fff, 0 0 20px var(--accent);
+    z-index: 100;
+  }
+  
+  /* Badge de borrar */
+  .delete-badge {
+    position: absolute;
+    top: -5px; right: -5px;
+    width: 24px; height: 24px;
+    background: #ff4444;
+    border: 2px solid white;
+    border-radius: 50%;
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+    z-index: 2000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .input-btn.editing .delete-badge,
+  .input-btn:hover .delete-badge {
+    opacity: 1; pointer-events: auto;
+  }
+
+  #selectionBox {
+    position: absolute;
+    border: 1px solid rgba(124, 77, 255, 0.8);
+    background: rgba(124, 77, 255, 0.2);
+    display: none;
+    z-index: 9999;
+    pointer-events: none;
+  }
+
+  /* Paneles */
+  #rightPanel, #leftPanel {
+    position: fixed;
+    top: 0; bottom: 0;
+    background: var(--panel-bg);
+    backdrop-filter: blur(15px);
+    transition: transform 0.4s cubic-bezier(0.22,1,0.36,1);
+    z-index: 9999;
+    padding: 25px;
+    box-sizing: border-box;
+    overflow-y: auto;
+  }
+  #rightPanel { right: 0; width: 380px; transform: translateX(100%); box-shadow: -10px 0 50px rgba(0,0,0,0.8); }
+  #leftPanel { left: 0; width: 360px; transform: translateX(-100%); box-shadow: 10px 0 50px rgba(0,0,0,0.8); }
+  
+  #rightPanel.open { transform: translateX(0); }
+  #leftPanel.open { transform: translateX(0); }
+
+  .tabs-container {
+    display: flex; margin-bottom: 20px; background: #111; border-radius: 8px; padding: 3px;
+  }
+  .tab-btn {
+    flex: 1; padding: 10px; background: transparent; color: #888; border: none; cursor: pointer; border-radius: 6px; font-size: 14px; transition: all 0.2s;
+  }
+  .tab-btn.active { background: var(--accent); color: white; font-weight: bold; }
+  .panel-page { display: none; animation: fadeIn 0.3s ease; }
+  .panel-page.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+  #fab {
+    position: fixed; bottom: 30px; right: 30px;
+    width: 68px; height: 68px; background: var(--accent); border-radius: 50%;
+    display: grid; place-items: center; font-size: 36px; cursor: pointer;
+    box-shadow: 0 10px 30px rgba(124,77,255,0.5); z-index: 9998; transition: all 0.3s;
+  }
+  #fab:hover { transform: scale(1.15) rotate(90deg); }
+
+  .close { float: right; cursor: pointer; font-size: 28px; opacity: 0.7; }
+  h2 { margin-top: 0; color: #ccc; }
+  input, select, button {
+    width: 100%; padding: 12px; margin: 10px 0; border-radius: 10px; border: none; background: #222; color: white; font-size: 15px;
+  }
+  button { background: var(--accent); cursor: pointer; font-weight: bold; }
+  button:hover { background: #9d7aff; }
+  
+  /* Botón Temas */
+  #btnThemesToggle {
+      background: linear-gradient(45deg, #444, #666);
+      margin-top: 5px;
+      border: 1px solid #777;
+  }
+  #themeList {
+      display: none;
+      background: rgba(0,0,0,0.3);
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      border: 1px solid #333;
+  }
+  .theme-option {
+      padding: 10px;
+      margin: 5px 0;
+      background: #2a2a2a;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s;
+      border-left: 3px solid transparent;
+  }
+  .theme-option:hover { background: #3a3a3a; border-left-color: var(--accent); }
+
+  /* Mando UI */
+  button.learning { background: var(--warning); color: #000; animation: pulse 1s infinite; }
+  @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+
+  label { font-size: 14px; opacity: 0.8; }
+  input[type="text"]:focus, input[type="number"]:focus { outline: 2px solid var(--accent); background: #333; }
+
+  .gamepad-status { font-size: 13px; color: #aaa; margin-top: -5px; margin-bottom: 15px; padding-left: 5px; border-left: 2px solid #555; }
+  #globalGamepadStatus {
+    font-size: 12px; color: #888; text-align: center; margin-top: 20px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px;
+  }
+  #globalGamepadStatus.connected { color: var(--success); border: 1px solid var(--success); }
+  
+  #toast {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    background: #333; color: white; padding: 10px 20px; border-radius: 20px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+    opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 10000;
+    display: flex; align-items: center; gap: 10px;
+  }
+  #toast.show { opacity: 1; }
+  .dot { width: 10px; height: 10px; background: var(--success); border-radius: 50%; }
+
+  /* --- INPUT VIEWER --- */
+  #inputDisplayContainer {
+    position: fixed; width: 300px; background: rgba(0, 0, 0, 0.85); border-radius: 10px; border-left: 4px solid var(--accent); padding: 10px; z-index: 50; cursor: grab; box-shadow: 0 10px 30px rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: none; user-select: none;
+  }
+  #inputDisplayContainer:active { cursor: grabbing; }
+  .history-row {
+    display: flex; align-items: center; justify-content: flex-start; height: 38px; margin-bottom: 2px; position: relative; border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .history-row::after {
+    content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 1px; background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%);
+  }
+  .frame-count {
+    font-family: 'Consolas', monospace; font-size: 12px; color: #ccc; width: 30px; text-align: right; margin-right: 8px; flex-shrink: 0;
+  }
+  .input-icon {
+    width: 32px; height: 32px; margin-right: 2px; display: flex; align-items: center; justify-content: center; position: relative;
+  }
+  .input-icon img { width: 100%; height: 100%; object-fit: contain; }
+  .fallback-icon {
+    background: #333; color: #fff; border-radius: 4px; padding: 2px 6px; font-size: 14px; font-weight: bold; border: 1px solid #555; min-width: 18px; text-align: center;
+  }
+  .combo-item { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; margin-top: 10px; position: relative; border: 1px solid #333; }
+  .combo-keys { font-size: 12px; font-weight: bold; color: var(--accent); margin-bottom: 5px; }
+  .combo-delete { position: absolute; top: 5px; right: 5px; color: #ff4444; cursor: pointer; font-weight: bold; padding: 2px 6px; }
+
+</style>
+</head>
+<body>
+
+<div id="canvas"></div>
+<div id="selectionBox"></div>
+<div id="toast"><div class="dot"></div><span id="toastMsg">Mensaje</span></div>
+
+<!-- INPUT VIEWER -->
+<div id="inputDisplayContainer"></div>
+
+<!-- PANEL DERECHO -->
+<div id="rightPanel">
+  <div class="close" onclick="closeRightPanel()">×</div>
+  <div class="tabs-container">
+    <button class="tab-btn active" onclick="switchRightTab('general')" id="tab-general">General</button>
+    <button class="tab-btn" onclick="switchRightTab('viewer')" id="tab-viewer">Input Viewer</button>
+  </div>
+
+  <!-- PÁGINA 1: GENERAL -->
+  <div id="page-general" class="panel-page active">
+    <h2>Configuración</h2>
+    <p style="opacity:0.7;">Editor Pro • 100% Custom</p>
+    <hr style="border-color:#333;">
+
+    <button onclick="addNewButton()">+ Añadir Botón</button>
+
+    <!-- NUEVO: Selector de Temas -->
+    <button id="btnThemesToggle" onclick="toggleThemesList()">🎨 Galería de Temas</button>
+    <div id="themeList">
+        <p style="font-size:12px; color:#aaa; margin-top:0;">Aplica a los botones seleccionados:</p>
+        <div class="theme-option" onclick="applyThemeToSelection('glass')">🔹 Glass (Original)</div>
+        <div class="theme-option" onclick="applyThemeToSelection('neon')">⚡ Neon Hollow (Cyberpunk)</div>
+        <div class="theme-option" onclick="applyThemeToSelection('metal')">🛡️ Metallic Gel (Premium)</div>
+        <div class="theme-option" onclick="applyThemeToSelection('arcade')">🕹️ Arcade Solid (Clásico)</div>
+        <div class="theme-option" onclick="applyThemeToSelection('soft')">✨ Soft Glow (Suave)</div>
+        <div class="theme-option" onclick="applyThemeToSelection('plain')">⬜ Minimalist (Plano)</div>
+    </div>
+
+    <label>Fondo de Pantalla</label>
+    <input type="text" id="bgInput" value="transparent" placeholder="#000000">
+
+    <hr style="border-color:#333;margin:20px 0">
+    <label>Importar Config (JSON)</label>
+    <input type="text" id="importInput" placeholder="Pega el código aquí y presiona Enter">
+
+    <button onclick="exportConfig()" style="margin-top:5px;">Exportar Todo</button>
+    <button onclick="clearAll()" style="background:#ff4444; margin-top:20px;">Borrar Todo</button>
+    
+    <div id="globalGamepadStatus">Esperando mando...</div>
+  </div>
+
+  <!-- PÁGINA 2: INPUT VIEWER -->
+  <div id="page-viewer" class="panel-page">
+    <h2>Input Viewer</h2>
+    <p style="font-size:12px; color:#aaa;">Estilo Street Fighter 6.</p>
+    <label>Restablecer Posición</label>
+    <button onclick="resetViewerPos()" style="background:#333;">Centrar Viewer</button>
+    <label>Fondo del Viewer</label>
+    <div style="display:flex; gap:5px;">
+        <input type="color" id="viewerBgColorPicker" value="#000000" oninput="updateViewerBg(this.value)">
+        <input type="text" id="viewerBgColorText" value="rgba(0,0,0,0.85)" oninput="updateViewerBg(this.value)">
+    </div>
+    <label>Color Borde</label>
+    <div style="display:flex; gap:5px;">
+        <input type="color" id="viewerBorderColorPicker" value="#7c4dff" oninput="updateBorderColor(this.value)">
+        <input type="text" id="viewerBorderColorText" value="#7c4dff" oninput="updateBorderColor(this.value)">
+    </div>
+    <label>Tamaño Fuente</label>
+    <input type="number" id="viewerFontSize" value="12" oninput="saveViewerConfig()">
+    <hr style="border-color:#333;">
+    <h3>Configuración Básica</h3>
+    <div><span style="font-size:11px">Neutral (N)</span><input type="text" id="url_N" oninput="saveViewerConfig()"></div>
+    <h3>Ataques</h3>
+    <div id="attackUrlContainer"></div>
+    <button onclick="refreshAttackInputs()" style="font-size:12px; padding:5px;">Refrescar Lista</button>
+    <h3>Diagonales</h3>
+    <div id="customCombosContainer"></div>
+    <button onclick="startComboLearning()" style="background:var(--accent); margin-top:10px;">+ Añadir Diagonal</button>
+  </div>
+</div>
+
+<!-- PANEL IZQUIERDO (EDITOR) -->
+<div id="leftPanel">
+  <div class="close" onclick="closeEditor()">×</div>
+  <h2>Editar Botón</h2>
+  <label>Texto</label><input type="text" id="editText" placeholder="Ej: LP" oninput="updateCurrentButton()">
+  <label>Es Macro de</label><input type="text" id="editMacro" placeholder="Ej: LP, MP" oninput="updateCurrentButton()">
+  <label>Tecla</label><input type="text" id="editKey" placeholder="x" oninput="updateCurrentButton()">
+  
+  <label style="color:#fff;margin-top:20px;display:block;font-weight:bold;">Gamepad</label>
+  <div style="background:rgba(255,255,255,0.05);padding:10px;border-radius:8px;">
+      <div id="gamepadStatusText" class="gamepad-status">Ninguno</div>
+      <div style="display:flex;gap:10px;"><button id="btnAssignGamepad" onclick="startLearning()">Detectar</button><button onclick="clearGamepadMapping()" style="background:#444;width:50px;">🗑️</button></div>
+  </div>
+
+  <label>Tamaño (px)</label><input type="number" id="editSize" value="80" oninput="updateCurrentButton()">
+  <label>Colores (Inactivo / Activo)</label>
+  <div style="display:flex; gap:10px;">
+    <input type="color" id="colorInactive" value="#1e1e32" oninput="updateCurrentButton()">
+    <input type="color" id="colorActive" value="#7c4dff" oninput="updateCurrentButton()">
+  </div>
+
+  <!-- ESTILO VISUAL (Solo informativo, se cambia desde galería) -->
+  <label>Estilo Visual (Tema)</label>
+  <input type="text" id="editStyleDisplay" disabled style="opacity:0.5; cursor:not-allowed;" value="glass">
+
+  <label>Efecto de Click</label>
+  <select id="editClickEffect" onchange="updateCurrentButton()">
+    <option value="down">Hundir</option>
+    <option value="up">Resaltar</option>
+  </select>
+</div>
+
+<div id="fab" onclick="clickFab()">⚙</div>
+
+<script>
+// --- Variables Globales ---
+let elements = [];
+let selectedBtn = null;
+let clipboard = null;
+let selectedIds = []; 
+let isDragging = false;
+let isPotentialDrag = false;
+let isSelecting = false;
+let dragStart = { x: 0, y: 0 };
+let selectionStart = { x: 0, y: 0 };
+
+// Variables Gamepad
+let learningMode = false;
+let activeKeys = new Set(); 
+let activeGamepadInputs = new Set();
+let connectedGamepadIndex = null;
+
+// Viewer
+const MAX_HISTORY = 19;
+let inputHistory = []; 
+inputHistory.push({ frames: 1, inputs: ['N'], id: Date.now() });
+
+const DIRECTIONS = ['UP', 'DOWN', 'LEFT', 'RIGHT', 'U', 'D', 'L', 'R', 'F', 'B', 'N', '8', '2', '4', '6', '1', '3', '7', '9', 'ARRIBA', 'ABAJO', 'IZQUIERDA', 'DERECHA', 'ATRAS', 'ATRÁS', 'ADELANTE', '↖', '↑', '↗', '←', '→', '↙', '↓', '↘'];
+let inputActivationTimes = {}; 
+
+let isComboLearning = false;
+let comboLearningStep = 0; 
+let tempComboKeys = [];
+
+let viewerConfig = {
+    x: 50, y: 230, fontSize: 12, borderColor: '#7c4dff', backgroundColor: 'rgba(0, 0, 0, 0.85)', urls: { N:'' }, customCombos: []
+};
+let isDraggingViewer = false;
+let viewerWasDragged = false; 
+let viewerDragStart = { x: 0, y: 0 };
+
+// --- EVENTOS ---
+
+window.addEventListener("gamepadconnected", (e) => { connectedGamepadIndex = e.gamepad.index; showToast(`Mando conectado`); updateGlobalStatus(); });
+window.addEventListener("gamepaddisconnected", (e) => { showToast("Mando desconectado"); connectedGamepadIndex = null; updateGlobalStatus(); });
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').innerText = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function updateGlobalStatus() {
+  const el = document.getElementById('globalGamepadStatus');
+  const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+  let found = false;
+  for(let i=0; i<gamepads.length; i++) {
+    if(gamepads[i]) {
+      el.innerHTML = `✅ <b>Conectado:</b><br>${gamepads[i].id.substring(0, 20)}...`;
+      el.classList.add('connected'); found = true; break;
+    }
+  }
+  if(!found) { el.innerHTML = `❌ No detectado.`; el.classList.remove('connected'); }
+}
+
+function gamepadLoop() {
+  const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+  let frameActiveIds = new Set();
+  
+  for (let i = 0; i < gamepads.length; i++) {
+    const gp = gamepads[i];
+    if (!gp) continue;
+    if(!document.getElementById('globalGamepadStatus').classList.contains('connected')) updateGlobalStatus();
+
+    if (learningMode && selectedBtn) {
+      for (let b = 0; b < gp.buttons.length; b++) {
+        if (gp.buttons[b].pressed) {
+          selectedBtn.gamepadMap = { type: 'button', index: b, padIndex: i }; 
+          finishLearning(); requestAnimationFrame(gamepadLoop); return; 
+        }
+      }
+      for (let a = 0; a < gp.axes.length; a++) {
+        if (Math.abs(gp.axes[a]) > 0.5) {
+          selectedBtn.gamepadMap = { type: 'axis', index: a, value: gp.axes[a] > 0 ? 1 : -1, padIndex: i };
+          finishLearning(); requestAnimationFrame(gamepadLoop); return;
+        }
+      }
+    }
+    elements.forEach(btn => {
+      if (!btn.gamepadMap) return;
+      const map = btn.gamepadMap;
+      let active = false;
+      if (map.type === 'button' && gp.buttons[map.index]?.pressed) active = true;
+      if (map.type === 'axis') {
+         const val = gp.axes[map.index];
+         if (map.value > 0 && val > 0.3) active = true;
+         if (map.value < 0 && val < -0.3) active = true;
+      }
+      if (active) frameActiveIds.add(btn.id);
+    });
+  }
+
+  elements.forEach(btn => { if(btn.key && activeKeys.has(btn.key)) frameActiveIds.add(btn.id); });
+
+  let needsRender = false;
+  frameActiveIds.forEach(id => { if (!activeGamepadInputs.has(id)) { activeGamepadInputs.add(id); needsRender = true; } });
+  activeGamepadInputs.forEach(id => { if (!frameActiveIds.has(id)) { activeGamepadInputs.delete(id); needsRender = true; } });
+  
+  if (needsRender) {
+    elements.forEach(btn => {
+      const el = document.querySelector(`[data-id="${btn.id}"]`);
+      if(el) applyStyle(el, btn);
+    });
+  }
+  processInputViewerFrame(frameActiveIds);
+  requestAnimationFrame(gamepadLoop);
+}
+requestAnimationFrame(gamepadLoop);
+
+// --- INPUT VIEWER ---
+
+function processInputViewerFrame(activeIds) {
+    let rawInputs = [];
+    activeIds.forEach(id => {
+        const btn = elements.find(b => b.id === id);
+        if(btn) {
+            if (btn.macro && btn.macro.trim() !== '') {
+                const targets = btn.macro.split(',').map(s => s.trim().toUpperCase());
+                rawInputs.push(...targets);
+            } else { rawInputs.push(btn.text.toUpperCase()); }
+        }
+    });
+    rawInputs = [...new Set(rawInputs)];
+
+    let processedInputs = [];
+    let inputsToConsume = [...rawInputs]; 
+    if (viewerConfig.customCombos && viewerConfig.customCombos.length > 0) {
+        viewerConfig.customCombos.forEach(combo => {
+            const key1 = combo.keys[0]; const key2 = combo.keys[1];
+            if (inputsToConsume.includes(key1) && inputsToConsume.includes(key2)) {
+                processedInputs.push(`COMBO_ID:${combo.id}`);
+                const idx1 = inputsToConsume.indexOf(key1); if (idx1 > -1) inputsToConsume.splice(idx1, 1);
+                const idx2 = inputsToConsume.indexOf(key2); if (idx2 > -1) inputsToConsume.splice(idx2, 1);
+            }
+        });
+    }
+    processedInputs = [...processedInputs, ...inputsToConsume];
+
+    const now = Date.now();
+    processedInputs.forEach(input => { if (!inputActivationTimes[input]) inputActivationTimes[input] = now; });
+    Object.keys(inputActivationTimes).forEach(key => { if (!processedInputs.includes(key)) delete inputActivationTimes[key]; });
+
+    let finalInputs = [];
+    if (processedInputs.length === 0) finalInputs = ['N']; else finalInputs = processedInputs;
+    
+    finalInputs.sort((a, b) => {
+        const isDirection = (key) => {
+             if (DIRECTIONS.includes(key)) return true;
+             if (key.startsWith('COMBO_ID:')) {
+                 const id = parseInt(key.split(':')[1]);
+                 const combo = viewerConfig.customCombos.find(c => c.id === id);
+                 if (combo && combo.keys.every(k => DIRECTIONS.includes(k))) return true;
+             }
+             return false;
+        };
+        const isDirA = isDirection(a); const isDirB = isDirection(b);
+        if (isDirA && !isDirB) return -1; if (!isDirA && isDirB) return 1;
+        if (!isDirA && !isDirB) {
+            const timeA = inputActivationTimes[a] || 0; const timeB = inputActivationTimes[b] || 0;
+            if (timeA !== timeB) return timeA - timeB;
+        }
+        return a.localeCompare(b);
+    });
+
+    const currentInputString = finalInputs.join('+');
+    if (inputHistory.length === 0) {
+        inputHistory.push({ frames: 1, inputs: finalInputs, id: Date.now() });
+    } else {
+        const topEntry = inputHistory[0];
+        const topInputString = topEntry.inputs.join('+');
+        if (currentInputString === topInputString) {
+            topEntry.frames++; updateTopRowDisplay(topEntry); 
+        } else {
+            const newEntry = { frames: 1, inputs: finalInputs, id: Date.now() };
+            inputHistory.unshift(newEntry);
+            if (inputHistory.length > MAX_HISTORY) inputHistory.pop();
+            renderInputHistory(); 
+            document.getElementById('inputDisplayContainer').style.display = 'block';
+        }
+    }
+}
+
+function updateTopRowDisplay(entry) {
+    const container = document.getElementById('inputDisplayContainer');
+    if (!container.firstElementChild) return;
+    const frameEl = container.firstElementChild.querySelector('.frame-count');
+    if (frameEl) frameEl.innerText = entry.frames > 99 ? '99+' : entry.frames;
+}
+
+function renderInputHistory() {
+    const container = document.getElementById('inputDisplayContainer');
+    container.innerHTML = ''; 
+    inputHistory.forEach(entry => {
+        const row = document.createElement('div'); row.className = 'history-row';
+        const frames = document.createElement('div'); frames.className = 'frame-count';
+        frames.style.fontSize = viewerConfig.fontSize + 'px';
+        frames.innerText = entry.frames > 99 ? '99+' : entry.frames;
+        row.appendChild(frames);
+        entry.inputs.forEach(inputKey => {
+            const div = document.createElement('div'); div.className = 'input-icon';
+            if (inputKey.startsWith('COMBO_ID:')) {
+                const comboId = parseInt(inputKey.split(':')[1]);
+                const combo = viewerConfig.customCombos.find(c => c.id === comboId);
+                if (combo && combo.url) {
+                    const img = document.createElement('img'); img.src = combo.url; div.appendChild(img);
+                } else {
+                    const span = document.createElement('div'); span.className = 'fallback-icon';
+                    span.innerText = combo ? (combo.keys[0]+'+'+combo.keys[1]) : '?'; div.appendChild(span);
+                }
+            } else { renderIconOrText(div, inputKey); }
+            row.appendChild(div);
+        });
+        container.appendChild(row);
+    });
+}
+function renderIconOrText(container, key) {
+    const url = viewerConfig.urls[key];
+    if (url) { const img = document.createElement('img'); img.src = url; container.appendChild(img); } 
+    else { const span = document.createElement('div'); span.className = 'fallback-icon'; span.innerText = key === 'N' ? '.' : key; container.appendChild(span); }
+}
+
+// --- PANELES ---
+
+function clickFab() {
+    const panel = document.getElementById('rightPanel');
+    closeEditor();
+    if (panel.classList.contains('open')) { switchRightTab('general'); } 
+    else { panel.classList.add('open'); switchRightTab('general'); }
+}
+function closeRightPanel() { document.getElementById('rightPanel').classList.remove('open'); }
+function switchRightTab(tabName) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + tabName).classList.add('active');
+    document.querySelectorAll('.panel-page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + tabName).classList.add('active');
+    if(tabName === 'viewer') { refreshAttackInputs(); renderCustomCombosList(); }
+}
+function updateBorderColor(val) { viewerConfig.borderColor = val; document.getElementById('inputDisplayContainer').style.borderLeftColor = val; saveViewerConfig(); }
+function updateViewerBg(val) { viewerConfig.backgroundColor = val; document.getElementById('inputDisplayContainer').style.background = val; saveViewerConfig(); }
+
+// --- COMBOS ---
+function startComboLearning() { isComboLearning = true; comboLearningStep = 1; tempComboKeys = []; showToast("MODO COMBOS: Pulsa btn 1"); closeRightPanel(); }
+function handleComboSelection(btn) {
+    if (!isComboLearning) return false;
+    if (comboLearningStep === 2 && tempComboKeys[0] === btn.text.toUpperCase()) { showToast("Elige otro."); return true; }
+    tempComboKeys.push(btn.text.toUpperCase());
+    if (comboLearningStep === 1) { comboLearningStep = 2; showToast(`Btn 1: ${btn.text}. Pulsa el 2do.`); } 
+    else if (comboLearningStep === 2) {
+        const newCombo = { id: Date.now(), keys: tempComboKeys, url: '' };
+        if (!viewerConfig.customCombos) viewerConfig.customCombos = [];
+        viewerConfig.customCombos.push(newCombo);
+        showToast(`Diagonal creada.`); isComboLearning = false; comboLearningStep = 0;
+        document.getElementById('rightPanel').classList.add('open'); switchRightTab('viewer');
+        setTimeout(() => { const container = document.getElementById('customCombosContainer'); container.lastElementChild?.scrollIntoView({ behavior: 'smooth' }); saveViewerConfig(); }, 100);
+    }
+    return true; 
+}
+function renderCustomCombosList() {
+    const container = document.getElementById('customCombosContainer'); container.innerHTML = '';
+    if (!viewerConfig.customCombos) viewerConfig.customCombos = [];
+    viewerConfig.customCombos.forEach((combo, index) => {
+        const div = document.createElement('div'); div.className = 'combo-item';
+        const deleteBtn = document.createElement('div'); deleteBtn.className = 'combo-delete'; deleteBtn.innerText = '×'; deleteBtn.onclick = () => deleteCombo(index);
+        const title = document.createElement('div'); title.className = 'combo-keys'; title.innerText = `${combo.keys[0]} + ${combo.keys[1]}`;
+        const inp = document.createElement('input'); inp.type = 'text'; inp.placeholder = 'URL Imagen'; inp.style.fontSize='12px'; inp.style.padding='8px'; inp.style.marginTop='0'; inp.value = combo.url || '';
+        inp.oninput = (e) => { combo.url = e.target.value; saveViewerConfig(); };
+        div.appendChild(deleteBtn); div.appendChild(title); div.appendChild(inp); container.appendChild(div);
+    });
+}
+function deleteCombo(index) { viewerConfig.customCombos.splice(index, 1); saveViewerConfig(); renderCustomCombosList(); }
+
+// --- EDITOR Y TEMAS ---
+
+// NUEVO: Función para alternar lista de temas
+function toggleThemesList() {
+    const list = document.getElementById('themeList');
+    list.style.display = list.style.display === 'block' ? 'none' : 'block';
+}
+
+// NUEVO: Aplicar tema a selección o a futuro
+function applyThemeToSelection(themeName) {
+    if (selectedIds.length === 0) {
+        showToast("⚠️ Selecciona botones primero");
+        return;
+    }
+    
+    selectedIds.forEach(id => {
+        const btn = elements.find(b => b.id === id);
+        if(btn) {
+            btn.style = themeName;
+            updateButtonVisual(btn);
+        }
+    });
+    
+    // Si el editor está abierto, actualizar el campo visual
+    if (selectedBtn) {
+        document.getElementById('editStyleDisplay').value = themeName;
+    }
+    
+    saveToStorage();
+    showToast(`Tema "${themeName}" aplicado a ${selectedIds.length} botones.`);
+}
+
+
+function openEditor(btn = null) {
+  selectedBtn = btn;
+  updateLearningButtonUI();
+  document.querySelectorAll('.input-btn').forEach(el => el.classList.remove('editing'));
+  
+  document.getElementById('leftPanel').classList.add('open');
+  closeRightPanel(); 
+
+  if (btn) {
+    const el = document.querySelector(`[data-id="${btn.id}"]`);
+    if(el) el.classList.add('editing');
+    document.getElementById('editText').value = btn.text || '';
+    document.getElementById('editKey').value = btn.key || '';
+    document.getElementById('editSize').value = btn.size || 80;
+    document.getElementById('colorInactive').value = btn.colorInactive || '#1e1e32';
+    document.getElementById('colorActive').value = btn.colorActive || '#7c4dff';
+    document.getElementById('editStyleDisplay').value = btn.style || 'glass'; // Actualizar display
+    document.getElementById('editClickEffect').value = btn.clickEffect || 'down';
+    document.getElementById('editMacro').value = btn.macro || '';
+    updateGamepadStatusText(btn.gamepadMap);
+  } else {
+    document.getElementById('editText').value = 'LP'; document.getElementById('editKey').value = '';
+    document.getElementById('editSize').value = 90; document.getElementById('colorInactive').value = '#1e1e32';
+    document.getElementById('colorActive').value = '#7c4dff'; document.getElementById('editStyleDisplay').value = 'glass';
+    document.getElementById('editClickEffect').value = 'down'; document.getElementById('editMacro').value = '';
+    updateGamepadStatusText(null);
+  }
+}
+
+function closeEditor() {
+  document.getElementById('leftPanel').classList.remove('open');
+  document.querySelectorAll('.input-btn').forEach(el => el.classList.remove('editing'));
+  selectedBtn = null; learningMode = false; updateLearningButtonUI();
+}
+
+function addNewButton() {
+  const size = 90;
+  const newBtn = {
+    id: Date.now(), x: innerWidth/2 - size/2, y: innerHeight/2 - size/2, size: size,
+    text: 'LP', key: '', colorInactive: '#1e1e32', colorActive: '#7c4dff',
+    style: 'glass', clickEffect: 'down', macro: '', gamepadMap: null
+  };
+  elements.push(newBtn); renderButton(newBtn); openEditor(newBtn); saveToStorage();
+}
+
+function updateCurrentButton() {
+  if (!selectedBtn) return;
+  selectedBtn.text = document.getElementById('editText').value;
+  selectedBtn.key = document.getElementById('editKey').value.toLowerCase();
+  selectedBtn.size = parseInt(document.getElementById('editSize').value) || 80;
+  selectedBtn.colorInactive = document.getElementById('colorInactive').value;
+  selectedBtn.colorActive = document.getElementById('colorActive').value;
+  selectedBtn.clickEffect = document.getElementById('editClickEffect').value;
+  selectedBtn.macro = document.getElementById('editMacro').value; 
+  // No actualizamos style desde aquí, solo colores
+  updateButtonVisual(selectedBtn); refreshAttackInputs(); saveToStorage();
+}
+
+function startLearning() { if(!selectedBtn) return; learningMode = true; updateLearningButtonUI(); }
+function clearGamepadMapping() { if(!selectedBtn) return; selectedBtn.gamepadMap = null; updateGamepadStatusText(null); saveToStorage(); }
+function finishLearning() { learningMode = false; updateLearningButtonUI(); updateGamepadStatusText(selectedBtn.gamepadMap); saveToStorage(); }
+function updateLearningButtonUI() {
+  const btn = document.getElementById('btnAssignGamepad');
+  if(learningMode) { btn.textContent = "Pulsar..."; btn.classList.add('learning'); } else { btn.textContent = "Detectar Input"; btn.classList.remove('learning'); }
+}
+function updateGamepadStatusText(map) {
+  const txt = document.getElementById('gamepadStatusText');
+  if (!map) { txt.textContent = "Ninguno"; txt.style.color = "#aaa"; } else {
+    txt.innerHTML = map.type === 'button' ? `Botón ${map.index}` : `Eje ${map.index} [${map.value > 0 ? '+' : '-'}]`; txt.style.color = "#ccc";
+  }
+}
+
+function renderButton(btn) {
+  const el = document.createElement('div'); el.className = 'input-btn'; el.dataset.id = btn.id;
+  const closeBadge = document.createElement('div'); closeBadge.className = 'delete-badge'; closeBadge.innerHTML = '×';
+  closeBadge.onmousedown = (e) => e.stopPropagation(); closeBadge.onclick = (e) => { e.stopPropagation(); deleteButton(btn.id); };
+  el.appendChild(closeBadge);
+  applyStyle(el, btn);
+  el.textContent = btn.text || ''; 
+  el.style.width = el.style.height = btn.size + 'px'; el.style.left = btn.x + 'px'; el.style.top = btn.y + 'px';
+  el.onmousedown = (e) => startDrag(e, btn); el.onmouseup = (e) => endDrag(e, btn);
+  document.getElementById('canvas').appendChild(el);
+}
+
+function updateButtonVisual(btn) {
+  const el = document.querySelector(`[data-id="${btn.id}"]`);
+  if (!el) return;
+  const badge = el.querySelector('.delete-badge'); el.textContent = btn.text || ''; if(badge) el.appendChild(badge);
+  el.style.width = el.style.height = btn.size + 'px'; el.style.left = btn.x + 'px'; el.style.top = btn.y + 'px';
+  applyStyle(el, btn);
+}
+
+function applyStyle(el, btn) {
+  // SETEAMOS VARIABLES CSS PARA QUE LOS TEMAS FUNCIONEN
+  el.style.setProperty('--btn-color', btn.colorInactive);
+  el.style.setProperty('--btn-border', btn.colorActive);
+  
+  // Limpiamos clases de estilo antiguas
+  el.classList.remove('style-glass', 'style-neon', 'style-metal', 'style-arcade', 'style-soft', 'style-plain');
+  
+  // Aplicamos tema
+  const themeClass = 'style-' + (btn.style || 'glass');
+  el.classList.add(themeClass);
+
+  const isPressed = activeKeys.has(btn.key) || activeGamepadInputs.has(btn.id);
+  if (isPressed) el.classList.add('active'); else el.classList.remove('active');
+  
+  el.classList.remove('effect-up', 'effect-down');
+  el.classList.add(btn.clickEffect === 'up' ? 'effect-up' : 'effect-down');
+  if (selectedIds.includes(btn.id)) el.classList.add('selected-multi'); else el.classList.remove('selected-multi');
+}
+
+// --- INTERACCIÓN RATÓN ---
+
+function startDrag(e, btn) {
+  if (e.button !== 0) return; e.stopPropagation();
+  if (isComboLearning) { handleComboSelection(btn); return; }
+  const wasPanelOpen = document.getElementById('leftPanel').classList.contains('open');
+  if (!selectedIds.includes(btn.id)) { clearSelection(); selectedIds = [btn.id]; updateSelectionVisuals(); }
+  if (wasPanelOpen) openEditor(btn); 
+  isPotentialDrag = true; isDragging = false; dragStart = { x: e.clientX, y: e.clientY };
+}
+
+const viewerEl = document.getElementById('inputDisplayContainer');
+viewerEl.onmousedown = (e) => {
+    if(e.button !== 0) return; isDraggingViewer = true; viewerWasDragged = false; 
+    viewerDragStart = { x: e.clientX - viewerEl.offsetLeft, y: e.clientY - viewerEl.offsetTop }; e.stopPropagation();
+};
+
+document.getElementById('canvas').onmousedown = (e) => {
+  if (e.button !== 0) return; if (e.target.id !== 'canvas') return;
+  if (isComboLearning) { isComboLearning = false; comboLearningStep = 0; showToast("Cancelado"); return; }
+  clearSelection(); closeEditor(); closeRightPanel(); isSelecting = true;
+  selectionStart = { x: e.clientX, y: e.clientY };
+  const box = document.getElementById('selectionBox'); box.style.left = e.clientX + 'px'; box.style.top = e.clientY + 'px'; box.style.width = '0px'; box.style.height = '0px'; box.style.display = 'block';
+};
+
+document.onmousemove = (e) => {
+  if (isPotentialDrag) {
+    const dx = e.clientX - dragStart.x; const dy = e.clientY - dragStart.y;
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) isDragging = true;
+    if (isDragging) {
+        selectedIds.forEach(id => {
+            const btnObj = elements.find(b => b.id === id);
+            if (btnObj) { btnObj.x += dx; btnObj.y += dy; const el = document.querySelector(`[data-id="${id}"]`); if (el) { el.style.left = btnObj.x + 'px'; el.style.top = btnObj.y + 'px'; } }
+        });
+        dragStart = { x: e.clientX, y: e.clientY }; 
+    }
+  }
+  if (isDraggingViewer) {
+      viewerWasDragged = true; 
+      const nx = e.clientX - viewerDragStart.x; const ny = e.clientY - viewerDragStart.y;
+      viewerEl.style.left = nx + 'px'; viewerEl.style.top = ny + 'px'; viewerConfig.x = nx; viewerConfig.y = ny;
+  }
+  if (isSelecting) {
+    const currentX = e.clientX; const currentY = e.clientY;
+    const left = Math.min(selectionStart.x, currentX); const top = Math.min(selectionStart.y, currentY);
+    const width = Math.abs(currentX - selectionStart.x); const height = Math.abs(currentY - selectionStart.y);
+    const box = document.getElementById('selectionBox'); box.style.left = left + 'px'; box.style.top = top + 'px'; box.style.width = width + 'px'; box.style.height = height + 'px';
+    elements.forEach(btn => {
+      const btnEl = document.querySelector(`[data-id="${btn.id}"]`);
+      if(!btnEl) return;
+      const btnRect = btnEl.getBoundingClientRect();
+      if (left < btnRect.right && left + width > btnRect.left && top < btnRect.bottom && top + height > btnRect.top) {
+        if (!selectedIds.includes(btn.id)) selectedIds.push(btn.id);
+      } else { selectedIds = selectedIds.filter(id => id !== btn.id); }
+    });
+    updateSelectionVisuals();
+  }
+};
+
+function endDrag(e, btn) {
+    if (isPotentialDrag) { if (!isDragging) { openEditor(btn); } else if (isDragging) { saveToStorage(); } }
+    isPotentialDrag = false; isDragging = false;
+}
+
+document.onmouseup = () => {
+  if (isDragging) { isDragging = false; saveToStorage(); }
+  if (isDraggingViewer) { isDraggingViewer = false; if (!viewerWasDragged) { closeEditor(); document.getElementById('rightPanel').classList.add('open'); switchRightTab('viewer'); } saveViewerConfig(); }
+  isPotentialDrag = false;
+  if (isSelecting) { isSelecting = false; document.getElementById('selectionBox').style.display = 'none'; }
+};
+
+function clearSelection() { selectedIds = []; updateSelectionVisuals(); }
+function updateSelectionVisuals() {
+  document.querySelectorAll('.input-btn').forEach(el => { const id = parseInt(el.dataset.id); if (selectedIds.includes(id)) el.classList.add('selected-multi'); else el.classList.remove('selected-multi'); });
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { closeRightPanel(); closeEditor(); if(isComboLearning) { isComboLearning=false; showToast("Cancelado"); } return; }
+  if (e.target.tagName === 'INPUT') return;
+  const k = e.key.toLowerCase();
+  if (!activeKeys.has(k)) { activeKeys.add(k); elements.forEach(btn => { if (btn.key === k) { const el = document.querySelector(`[data-id="${btn.id}"]`); if(el) applyStyle(el, btn); } }); }
+  if (e.key === 'Delete' && selectedIds.length > 0) { selectedIds.forEach(id => deleteButton(id)); clearSelection(); }
+  if (e.ctrlKey && e.key === 'c' && selectedIds.length > 0) {
+    const primaryId = selectedIds[selectedIds.length - 1]; const btn = elements.find(b => b.id === primaryId);
+    if (btn) { clipboard = { ...btn, gamepadMap: null }; showToast("Copiado"); } e.preventDefault();
+  }
+  if (e.ctrlKey && e.key === 'v' && clipboard) {
+    const nuevo = { ...clipboard, id: Date.now(), x: clipboard.x + 30, y: clipboard.y + 30 }; elements.push(nuevo); renderButton(nuevo); saveToStorage(); e.preventDefault();
+  }
+});
+document.addEventListener('keyup', (e) => {
+  const k = e.key.toLowerCase(); if (activeKeys.has(k)) { activeKeys.delete(k); elements.forEach(btn => { if (btn.key === k) { const el = document.querySelector(`[data-id="${btn.id}"]`); if(el) applyStyle(el, btn); } }); }
+});
+
+function deleteButton(id) {
+  elements = elements.filter(b => b.id !== id); selectedIds = selectedIds.filter(sid => sid !== id);
+  document.querySelector(`[data-id="${id}"]`)?.remove(); if (selectedBtn && selectedBtn.id === id) closeEditor(); saveToStorage();
+}
+
+document.getElementById('bgInput').oninput = (e) => { document.body.style.background = e.target.value.trim() === 'transparent' ? 'transparent' : e.target.value.trim(); saveToStorage(); };
+
+// --- STORAGE ---
+function saveViewerConfig() {
+    viewerConfig.fontSize = parseInt(document.getElementById('viewerFontSize').value) || 12; viewerConfig.urls['N'] = document.getElementById('url_N').value;
+    document.querySelectorAll('.custom-url-input').forEach(inp => { viewerConfig.urls[inp.dataset.key] = inp.value; });
+    localStorage.setItem('fgcViewerConfig', JSON.stringify(viewerConfig)); renderInputHistory();
+}
+function loadViewerConfig(configOverride = null) {
+    let data = configOverride;
+    if (!data) { const str = localStorage.getItem('fgcViewerConfig'); if(str) { try { data = JSON.parse(str); } catch(e) {} } }
+    if(data) {
+        viewerConfig = { ...viewerConfig, ...data };
+        const el = document.getElementById('inputDisplayContainer');
+        el.style.left = viewerConfig.x + 'px'; el.style.top = viewerConfig.y + 'px';
+        el.style.borderLeftColor = viewerConfig.borderColor || '#7c4dff'; el.style.background = viewerConfig.backgroundColor || 'rgba(0, 0, 0, 0.85)';
+        document.getElementById('viewerFontSize').value = viewerConfig.fontSize;
+        document.getElementById('viewerBorderColorPicker').value = viewerConfig.borderColor; document.getElementById('viewerBorderColorText').value = viewerConfig.borderColor;
+        document.getElementById('viewerBgColorPicker').value = viewerConfig.backgroundColor || '#000000'; document.getElementById('viewerBgColorText').value = viewerConfig.backgroundColor || 'rgba(0, 0, 0, 0.85)';
+        document.getElementById('url_N').value = viewerConfig.urls['N'] || '';
+        renderCustomCombosList(); refreshAttackInputs();
+    }
+}
+function resetViewerPos() { const el = document.getElementById('inputDisplayContainer'); el.style.left = '50px'; el.style.top = '230px'; viewerConfig.x = 50; viewerConfig.y = 230; saveViewerConfig(); }
+function refreshAttackInputs() {
+    const container = document.getElementById('attackUrlContainer'); container.innerHTML = '';
+    const uniqueTexts = new Set(); elements.forEach(btn => { const t = btn.text.toUpperCase(); if(t !== 'N' && t.length > 0) uniqueTexts.add(t); });
+    uniqueTexts.forEach(txt => {
+        const wrap = document.createElement('div'); wrap.style.marginTop = '5px';
+        const label = document.createElement('label'); label.innerText = txt; label.style.fontSize = '12px';
+        const inp = document.createElement('input'); inp.type = 'text'; inp.placeholder = 'URL imagen'; inp.className = 'custom-url-input'; inp.dataset.key = txt; inp.value = viewerConfig.urls[txt] || ''; inp.oninput = saveViewerConfig;
+        wrap.appendChild(label); wrap.appendChild(inp); container.appendChild(wrap);
+    });
+}
+function copyTextToClipboard(text, successMsg, fallbackMsg) {
+  if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(() => showToast(successMsg)).catch(() => manualCopy(text, fallbackMsg)); } else manualCopy(text, fallbackMsg);
+}
+function manualCopy(text, msg) { const input = document.createElement('textarea'); input.value = text; document.body.appendChild(input); input.select(); document.execCommand('copy'); document.body.removeChild(input); showToast(msg); }
+document.getElementById('importInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    const str = this.value.trim(); if (!str) return;
+    try {
+      const data = JSON.parse(str); if (!data.elements) throw new Error('Formato inválido');
+      document.body.style.background = data.bg || 'transparent'; document.getElementById('bgInput').value = data.bg || 'transparent';
+      elements = data.elements || []; document.getElementById('canvas').innerHTML = ''; elements.forEach(renderButton); saveToStorage();
+      if (data.viewerConfig) { loadViewerConfig(data.viewerConfig); saveViewerConfig(); }
+      this.value = '¡Cargado!'; this.style.borderColor = '#0f0'; setTimeout(() => { this.value = ''; this.style.borderColor = ''; }, 1500);
+    } catch(err) { this.value = 'Error JSON'; this.style.borderColor = '#f00'; showToast('Error JSON'); setTimeout(() => { this.value = ''; this.style.borderColor = ''; }, 3000); }
+  }
+});
+function exportConfig() { const data = { bg: document.body.style.background, elements, viewerConfig: viewerConfig }; copyTextToClipboard(JSON.stringify(data), '✅ Config Copiada', 'Copiado'); }
+function clearAll() {
+  showToast('⚠️ Pulsa otra vez para borrar TODO.');
+  if (window.clearAllConfirmed) {
+      elements = []; document.getElementById('canvas').innerHTML = ''; localStorage.removeItem('fgcInputDisplayV2'); localStorage.removeItem('fgcViewerConfig');
+      viewerConfig.urls = { N:'' }; viewerConfig.customCombos = []; closeEditor(); window.clearAllConfirmed = false; showToast('🗑️ Borrado'); resetViewerPos(); loadViewerConfig(); 
+  } else { window.clearAllConfirmed = true; setTimeout(() => window.clearAllConfirmed = false, 3000); }
+}
+function saveToStorage() { const data = { bg: document.body.style.background, elements }; localStorage.setItem('fgcInputDisplayV2', JSON.stringify(data)); }
+function loadFromStorage() {
+  const str = localStorage.getItem('fgcInputDisplayV2'); if (!str) return;
+  try {
+    const data = JSON.parse(str); document.body.style.background = data.bg || 'transparent'; document.getElementById('bgInput').value = data.bg || 'transparent';
+    elements = data.elements || []; elements.forEach(renderButton);
+  } catch(e) {}
+}
+
+loadFromStorage();
+loadViewerConfig();
+</script>
+</body>
+</html>
