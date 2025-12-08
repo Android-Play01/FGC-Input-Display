@@ -176,6 +176,20 @@
   button { background: var(--accent); cursor: pointer; font-weight: bold; }
   button:hover { background: #9d7aff; }
   
+  /* Checkbox custom style */
+  .checkbox-container {
+      display: flex;
+      align-items: center;
+      margin: 10px 0;
+      cursor: pointer;
+      user-select: none;
+  }
+  .checkbox-container input {
+      width: auto;
+      margin-right: 10px;
+      cursor: pointer;
+  }
+  
   /* Estados del botón de aprendizaje */
   button.learning { background: var(--warning); color: #000; animation: pulse 1s infinite; }
   @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
@@ -244,7 +258,7 @@
   .frame-count {
     font-family: 'Consolas', monospace;
     font-size: 12px;
-    color: #ccc;
+    color: #ffffff;
     width: 30px;
     text-align: right;
     margin-right: 8px;
@@ -331,6 +345,15 @@
     </select>
 
     <hr style="border-color:#333;margin:20px 0">
+    
+    <div class="checkbox-container">
+        <input type="checkbox" id="socdToggle" onchange="saveSOCDConfig()">
+        <label for="socdToggle" style="margin:0; font-size:13px; color:#ffab00;">Activar SOCD Cleaning (Neutro)</label>
+    </div>
+    <p style="font-size:11px; color:#aaa; margin-top:-5px;">Cancela Izq+Der y Arr+Aba (Hitbox Style).</p>
+    
+    <hr style="border-color:#333;margin:20px 0">
+
     <label>Importar Config (JSON)</label>
     <input type="text" id="importInput" placeholder="Pega el código aquí y presiona Enter">
 
@@ -360,8 +383,22 @@
         <input type="text" id="viewerBorderColorText" value="#7c4dff" placeholder="transparent" oninput="updateBorderColor(this.value)">
     </div>
 
+    <hr style="border-color:#333; margin: 15px 0;">
+    <h3 style="font-size:14px; margin-bottom:10px; color:var(--accent);">Configuración Contador Frames</h3>
+
     <label>Tamaño Fuente Números (px)</label>
     <input type="number" id="viewerFontSize" value="12" oninput="saveViewerConfig()">
+
+    <label>Color Números</label>
+    <div style="display:flex; gap:5px;">
+        <input type="color" id="viewerFrameColorPicker" value="#ffffff" oninput="updateFrameColor(this.value)">
+        <input type="text" id="viewerFrameColorText" value="#ffffff" placeholder="#ffffff" oninput="updateFrameColor(this.value)">
+    </div>
+
+    <div class="checkbox-container">
+        <input type="checkbox" id="viewerFrameStroke" onchange="saveViewerConfig()" checked>
+        <label for="viewerFrameStroke" style="margin:0;">Añadir Trazo Negro (Mejor Visibilidad)</label>
+    </div>
 
     <hr style="border-color:#333;">
     <h3 style="font-size:14px; margin-bottom:5px; color:var(--accent);">Configuración Básica</h3>
@@ -459,13 +496,15 @@ let activeKeys = new Set();
 let activeGamepadInputs = new Set();
 let connectedGamepadIndex = null;
 
+// SOCD CONFIG
+let socdEnabled = false;
+
 // --- INPUT VIEWER VARIABLES ---
 const MAX_HISTORY = 19;
 let inputHistory = []; 
 inputHistory.push({ frames: 1, inputs: ['N'], id: Date.now() });
 
 // Lista de prioridades para ordenación (Direcciones siempre primero)
-// Se ha ampliado para incluir español y símbolos
 const DIRECTIONS = [
     'UP', 'DOWN', 'LEFT', 'RIGHT', // English
     'U', 'D', 'L', 'R', 'F', 'B', 'N', // Notation
@@ -475,6 +514,12 @@ const DIRECTIONS = [
     '↖', '↑', '↗', '←', '→', '↙', '↓', '↘' // Arrows
 ];
 
+// DICCIONARIOS SEMÁNTICOS PARA SOCD
+const SEMANTIC_UP = ['UP', 'U', 'ARRIBA', 'NUM8', 'W', '↑', '↖', '↗'];
+const SEMANTIC_DOWN = ['DOWN', 'D', 'ABAJO', 'NUM2', 'S', '↓', '↙', '↘'];
+const SEMANTIC_LEFT = ['LEFT', 'L', 'IZQUIERDA', 'ATRAS', 'BACK', 'NUM4', 'A', '←', '↖', '↙'];
+const SEMANTIC_RIGHT = ['RIGHT', 'R', 'DERECHA', 'ADELANTE', 'FWD', 'NUM6', 'D', '→', '↗', '↘'];
+
 // NUEVO: Rastrear cuándo se activó cada input para ordenar cronológicamente
 let inputActivationTimes = {}; 
 
@@ -483,13 +528,16 @@ let isComboLearning = false;
 let comboLearningStep = 0; // 0: inactivo, 1: esperando btn 1, 2: esperando btn 2
 let tempComboKeys = [];
 
+// Viewer Configuración
 let viewerConfig = {
     x: 50, y: 230,
     fontSize: 12,
     borderColor: '#7c4dff',
     backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    urls: { N:'' }, // Solo Neutral
-    customCombos: [] // Array de { id, keys: ['A','B'], url: '' }
+    frameColor: '#ffffff',
+    frameStroke: true,
+    urls: { N:'' }, 
+    customCombos: [] 
 };
 let isDraggingViewer = false;
 let viewerWasDragged = false; 
@@ -582,15 +630,33 @@ function gamepadLoop() {
       if(btn.key && activeKeys.has(btn.key)) frameActiveIds.add(btn.id);
   });
 
+  // --- SOCD CLEANING (Interceptar antes de renderizar) ---
+  if (socdEnabled) {
+      frameActiveIds = applySOCDCleaning(frameActiveIds);
+  }
+
   // 3. Renderizar Botones (Visual Canvas)
   let needsRender = false;
+  // Detectar cambios: Nuevos activos
   frameActiveIds.forEach(id => { if (!activeGamepadInputs.has(id)) { activeGamepadInputs.add(id); needsRender = true; } });
+  // Detectar cambios: Viejos activos que ya no estan
   activeGamepadInputs.forEach(id => { if (!frameActiveIds.has(id)) { activeGamepadInputs.delete(id); needsRender = true; } });
   
-  if (needsRender) {
+  // Forzar redibujado siempre si SOCD está activo para asegurar limpieza visual rápida
+  if (needsRender || socdEnabled) {
+    // Primero limpiamos todos visualmente (reset state) para evitar fantasmas SOCD
     elements.forEach(btn => {
-      const el = document.querySelector(`[data-id="${btn.id}"]`);
-      if(el) applyStyle(el, btn);
+        const el = document.querySelector(`[data-id="${btn.id}"]`);
+        if(el) {
+            // Si el ID no está en el set activo (limpio), se apaga
+            if (!frameActiveIds.has(btn.id)) {
+                el.style.background = btn.colorInactive;
+                el.classList.remove('active', 'effect-up', 'effect-down');
+                if (btn.style === 'plain') el.classList.add('plain');
+            } else {
+                applyStyle(el, btn);
+            }
+        }
     });
   }
 
@@ -600,6 +666,71 @@ function gamepadLoop() {
   requestAnimationFrame(gamepadLoop);
 }
 requestAnimationFrame(gamepadLoop);
+
+
+// --- LÓGICA SOCD ---
+function applySOCDCleaning(activeIds) {
+    let hasUp = false;
+    let hasDown = false;
+    let hasLeft = false;
+    let hasRight = false;
+
+    // Paso 1: Detectar intención bruta
+    activeIds.forEach(id => {
+        const btn = elements.find(b => b.id === id);
+        if (btn) {
+            const txt = btn.text.toUpperCase();
+            const key = (btn.key || '').toUpperCase();
+            
+            // Check Up
+            if (SEMANTIC_UP.includes(txt) || SEMANTIC_UP.includes(key)) hasUp = true;
+            // Check Down
+            if (SEMANTIC_DOWN.includes(txt) || SEMANTIC_DOWN.includes(key)) hasDown = true;
+            // Check Left
+            if (SEMANTIC_LEFT.includes(txt) || SEMANTIC_LEFT.includes(key)) hasLeft = true;
+            // Check Right
+            if (SEMANTIC_RIGHT.includes(txt) || SEMANTIC_RIGHT.includes(key)) hasRight = true;
+        }
+    });
+
+    // Paso 2: Calcular cancelaciones (Neutral SOCD)
+    const cancelVertical = hasUp && hasDown;
+    const cancelHorizontal = hasLeft && hasRight;
+
+    if (!cancelVertical && !cancelHorizontal) return activeIds; // Nada que limpiar
+
+    // Paso 3: Filtrar IDs conflictivos
+    const cleanedIds = new Set();
+
+    activeIds.forEach(id => {
+        const btn = elements.find(b => b.id === id);
+        if (!btn) return;
+        
+        const txt = btn.text.toUpperCase();
+        const key = (btn.key || '').toUpperCase();
+
+        let isDirty = false;
+
+        // Si es vertical y hay cancelación vertical -> Dirty
+        if (cancelVertical) {
+            if (SEMANTIC_UP.includes(txt) || SEMANTIC_UP.includes(key)) isDirty = true;
+            if (SEMANTIC_DOWN.includes(txt) || SEMANTIC_DOWN.includes(key)) isDirty = true;
+        }
+
+        // Si es horizontal y hay cancelación horizontal -> Dirty
+        if (cancelHorizontal) {
+            if (SEMANTIC_LEFT.includes(txt) || SEMANTIC_LEFT.includes(key)) isDirty = true;
+            if (SEMANTIC_RIGHT.includes(txt) || SEMANTIC_RIGHT.includes(key)) isDirty = true;
+        }
+
+        if (!isDirty) {
+            cleanedIds.add(id);
+        }
+    });
+
+    return cleanedIds;
+}
+
 
 // --- LÓGICA DEL INPUT VIEWER (SF6 REAL + CUSTOM COMBOS) ---
 
@@ -736,6 +867,14 @@ function updateTopRowDisplay(entry) {
     const frameEl = container.firstElementChild.querySelector('.frame-count');
     if (frameEl) {
         frameEl.innerText = entry.frames > 99 ? '99+' : entry.frames;
+        
+        // Asegurar que el estilo se mantiene
+        frameEl.style.color = viewerConfig.frameColor || '#ffffff';
+        if (viewerConfig.frameStroke) {
+             frameEl.style.textShadow = '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000';
+        } else {
+             frameEl.style.textShadow = 'none';
+        }
     }
 }
 
@@ -751,6 +890,16 @@ function renderInputHistory() {
         frames.className = 'frame-count';
         frames.style.fontSize = viewerConfig.fontSize + 'px';
         frames.innerText = entry.frames > 99 ? '99+' : entry.frames;
+        
+        // APLICAR COLOR Y TRAZO
+        frames.style.color = viewerConfig.frameColor || '#ffffff';
+        if (viewerConfig.frameStroke) {
+             // Simulación de trazo negro usando sombras sólidas (mejor compatibilidad)
+             frames.style.textShadow = '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000';
+        } else {
+             frames.style.textShadow = 'none';
+        }
+
         row.appendChild(frames);
         
         entry.inputs.forEach(inputKey => {
@@ -832,6 +981,13 @@ function updateBorderColor(val) {
 function updateViewerBg(val) {
     viewerConfig.backgroundColor = val;
     document.getElementById('inputDisplayContainer').style.background = val;
+    saveViewerConfig();
+}
+
+function updateFrameColor(val) {
+    viewerConfig.frameColor = val;
+    document.getElementById('viewerFrameColorPicker').value = val;
+    document.getElementById('viewerFrameColorText').value = val;
     saveViewerConfig();
 }
 
@@ -1272,10 +1428,22 @@ function applyGlobalStyle() {
   saveToStorage();
 }
 
+// --- CONFIGURACIÓN SOCD ---
+
+function saveSOCDConfig() {
+    socdEnabled = document.getElementById('socdToggle').checked;
+    saveToStorage(); // Guarda junto con la config general
+}
+
 // --- CONFIGURACIÓN VIEWER (Guardar/Cargar) ---
 
 function saveViewerConfig() {
     viewerConfig.fontSize = parseInt(document.getElementById('viewerFontSize').value) || 12;
+    viewerConfig.frameStroke = document.getElementById('viewerFrameStroke').checked;
+    
+    // Guardar también el color del frame si se editó
+    // La función updateFrameColor ya actualiza el objeto viewerConfig, pero aseguramos
+    
     viewerConfig.urls['N'] = document.getElementById('url_N').value;
     
     document.querySelectorAll('.custom-url-input').forEach(inp => {
@@ -1311,6 +1479,11 @@ function loadViewerConfig(configOverride = null) {
         document.getElementById('viewerBgColorPicker').value = viewerConfig.backgroundColor || '#000000';
         document.getElementById('viewerBgColorText').value = viewerConfig.backgroundColor || 'rgba(0, 0, 0, 0.85)';
         
+        // Cargar config de Frame Counter
+        document.getElementById('viewerFrameColorPicker').value = viewerConfig.frameColor || '#ffffff';
+        document.getElementById('viewerFrameColorText').value = viewerConfig.frameColor || '#ffffff';
+        document.getElementById('viewerFrameStroke').checked = (viewerConfig.frameStroke !== undefined) ? viewerConfig.frameStroke : true;
+
         const nInput = document.getElementById('url_N');
         if(nInput) nInput.value = viewerConfig.urls['N'] || '';
         
@@ -1402,7 +1575,8 @@ function exportConfig() {
   const data = { 
       bg: document.body.style.background, 
       elements,
-      viewerConfig: viewerConfig 
+      viewerConfig: viewerConfig,
+      socdEnabled: socdEnabled // Exportar también SOCD
   };
   copyTextToClipboard(JSON.stringify(data), '✅ Configuración copiada', '¡Copiado (fallback)!');
 }
@@ -1415,6 +1589,8 @@ function clearAll() {
       localStorage.removeItem('fgcViewerConfig');
       viewerConfig.urls = { N:'' };
       viewerConfig.customCombos = [];
+      socdEnabled = false;
+      document.getElementById('socdToggle').checked = false;
       closeEditor();
       window.clearAllConfirmed = false; showToast('🗑️ ¡Borrado completo!');
       resetViewerPos();
@@ -1423,7 +1599,11 @@ function clearAll() {
 }
 
 function saveToStorage() {
-  const data = { bg: document.body.style.background, elements };
+  const data = { 
+      bg: document.body.style.background, 
+      elements,
+      socdEnabled: socdEnabled 
+  };
   localStorage.setItem('fgcInputDisplayV2', JSON.stringify(data));
 }
 function loadFromStorage() {
@@ -1435,6 +1615,12 @@ function loadFromStorage() {
     document.getElementById('bgInput').value = data.bg || 'transparent';
     elements = data.elements || [];
     elements.forEach(renderButton);
+    
+    // Cargar config SOCD
+    socdEnabled = data.socdEnabled || false;
+    const socdToggle = document.getElementById('socdToggle');
+    if(socdToggle) socdToggle.checked = socdEnabled;
+
   } catch(e) {}
 }
 
