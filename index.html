@@ -175,6 +175,12 @@
   }
   button { background: var(--accent); cursor: pointer; font-weight: bold; }
   button:hover { background: #9d7aff; }
+
+  /* Disabled inputs style */
+  input:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+  }
   
   /* Checkbox custom style */
   .checkbox-container {
@@ -346,6 +352,7 @@
 
     <hr style="border-color:#333;margin:20px 0">
     
+    <!-- SOCD TOGGLE -->
     <div class="checkbox-container">
         <input type="checkbox" id="socdToggle" onchange="saveSOCDConfig()">
         <label for="socdToggle" style="margin:0; font-size:13px; color:#ffab00;">Activar SOCD Cleaning (Neutro)</label>
@@ -431,7 +438,7 @@
 <!-- Panel Editor (IZQUIERDA) -->
 <div id="leftPanel">
   <div class="close" onclick="closeEditor()">×</div>
-  <h2>Editar Botón</h2>
+  <h2 id="editorTitle">Editar Botón</h2>
   
   <label>Texto</label>
   <input type="text" id="editText" placeholder="Ej: LP" oninput="updateCurrentButton()">
@@ -481,9 +488,9 @@
 <script>
 // --- Variables Globales ---
 let elements = [];
-let selectedBtn = null;
+let selectedBtn = null; // Botón "principal" seleccionado (para mostrar datos en inputs)
 let clipboard = null;
-let selectedIds = []; 
+let selectedIds = []; // Lista de TODOS los IDs seleccionados
 let isDragging = false;
 let isPotentialDrag = false;
 let isSelecting = false;
@@ -1090,16 +1097,31 @@ function deleteCombo(index) {
 // --- Funciones UI del Editor ---
 
 function openEditor(btn = null) {
+  // btn es el botón que se acaba de tocar (o el principal de la selección)
   selectedBtn = btn;
   updateLearningButtonUI();
   document.querySelectorAll('.input-btn').forEach(el => el.classList.remove('editing'));
   
+  // Calcular modo edición masiva
+  const isMulti = selectedIds.length > 1;
+  const title = document.getElementById('editorTitle');
+  if (title) title.innerText = isMulti ? `Editar Selección (${selectedIds.length})` : 'Editar Botón';
+
   document.getElementById('leftPanel').classList.add('open');
   closeRightPanel(); 
 
+  // Deshabilitar campos únicos si es multiselección
+  document.getElementById('editText').disabled = isMulti;
+  document.getElementById('editKey').disabled = isMulti;
+  document.getElementById('editMacro').disabled = isMulti;
+  document.getElementById('btnAssignGamepad').disabled = isMulti;
+
   if (btn) {
+    // Si hay un botón de referencia, cargamos sus datos en los inputs
     const el = document.querySelector(`[data-id="${btn.id}"]`);
     if(el) el.classList.add('editing');
+
+    // Cargar datos (si es multi, carga los datos del último clicado como referencia)
     document.getElementById('editText').value = btn.text || '';
     document.getElementById('editKey').value = btn.key || '';
     document.getElementById('editSize').value = btn.size || 80;
@@ -1110,6 +1132,7 @@ function openEditor(btn = null) {
     document.getElementById('editMacro').value = btn.macro || '';
     updateGamepadStatusText(btn.gamepadMap);
   } else {
+    // Valores por defecto
     document.getElementById('editText').value = 'LP';
     document.getElementById('editKey').value = '';
     document.getElementById('editSize').value = 90;
@@ -1148,28 +1171,71 @@ function addNewButton() {
   };
   elements.push(newBtn);
   renderButton(newBtn);
+  
+  // Seleccionar el nuevo botón automáticamente
+  clearSelection();
+  selectedIds = [newBtn.id];
+  updateSelectionVisuals();
+  
   openEditor(newBtn); 
   saveToStorage();
 }
 
 function updateCurrentButton() {
-  if (!selectedBtn) return;
+  // LÓGICA DE EDICIÓN MASIVA (Bucle)
+  if (selectedIds.length === 0) return;
+
   const size = parseInt(document.getElementById('editSize').value) || 80;
-  selectedBtn.text = document.getElementById('editText').value;
-  selectedBtn.key = document.getElementById('editKey').value.toLowerCase();
-  selectedBtn.size = size;
-  selectedBtn.colorInactive = document.getElementById('colorInactive').value;
-  selectedBtn.colorActive = document.getElementById('colorActive').value;
-  selectedBtn.style = document.getElementById('editStyle').value;
-  selectedBtn.clickEffect = document.getElementById('editClickEffect').value;
-  selectedBtn.macro = document.getElementById('editMacro').value; 
-  updateButtonVisual(selectedBtn);
+  const colorInactive = document.getElementById('colorInactive').value;
+  const colorActive = document.getElementById('colorActive').value;
+  const style = document.getElementById('editStyle').value;
+  const clickEffect = document.getElementById('editClickEffect').value;
+  
+  // Campos únicos (solo se aplican si hay 1 seleccionado)
+  const text = document.getElementById('editText').value;
+  const key = document.getElementById('editKey').value.toLowerCase();
+  const macro = document.getElementById('editMacro').value;
+
+  const isMulti = selectedIds.length > 1;
+
+  // Aplicar cambios a TODOS los IDs seleccionados
+  selectedIds.forEach(id => {
+      const btn = elements.find(b => b.id === id);
+      if(btn) {
+          // Propiedades Comunes (se aplican siempre)
+          btn.size = size;
+          btn.colorInactive = colorInactive;
+          btn.colorActive = colorActive;
+          btn.style = style;
+          btn.clickEffect = clickEffect;
+          
+          // Propiedades Únicas (se aplican solo si es selección única)
+          if (!isMulti) {
+              btn.text = text;
+              btn.key = key;
+              btn.macro = macro;
+          }
+          
+          // Refrescar visualmente
+          updateButtonVisual(btn);
+      }
+  });
+
   refreshAttackInputs();
   saveToStorage();
 }
 
-function startLearning() { if(!selectedBtn) return; learningMode = true; updateLearningButtonUI(); }
-function clearGamepadMapping() { if(!selectedBtn) return; selectedBtn.gamepadMap = null; updateGamepadStatusText(null); saveToStorage(); }
+function startLearning() { 
+    if(!selectedBtn || selectedIds.length > 1) return; // Solo aprender 1 a 1
+    learningMode = true; 
+    updateLearningButtonUI(); 
+}
+function clearGamepadMapping() { 
+    if(!selectedBtn) return; 
+    selectedBtn.gamepadMap = null; 
+    updateGamepadStatusText(null); 
+    saveToStorage(); 
+}
 function finishLearning() { learningMode = false; updateLearningButtonUI(); updateGamepadStatusText(selectedBtn.gamepadMap); saveToStorage(); }
 function updateLearningButtonUI() {
   const btn = document.getElementById('btnAssignGamepad');
@@ -1240,10 +1306,39 @@ function startDrag(e, btn) {
       return; 
   }
 
-  const wasPanelOpen = document.getElementById('leftPanel').classList.contains('open');
-  if (!selectedIds.includes(btn.id)) { clearSelection(); selectedIds = [btn.id]; updateSelectionVisuals(); }
-  
-  if (wasPanelOpen) openEditor(btn); 
+  // LÓGICA DE MULTI-SELECCIÓN (SHIFT/CTRL CLICK)
+  const isMultiSelect = e.shiftKey || e.ctrlKey;
+
+  if (isMultiSelect) {
+      if (selectedIds.includes(btn.id)) {
+          // Deseleccionar si ya estaba
+          selectedIds = selectedIds.filter(id => id !== btn.id);
+          if (selectedIds.length === 0) {
+              closeEditor();
+          } else {
+              // Abrir editor con el último restante
+              const lastId = selectedIds[selectedIds.length - 1];
+              openEditor(elements.find(b => b.id === lastId));
+          }
+      } else {
+          // Agregar a la selección
+          selectedIds.push(btn.id);
+          openEditor(btn); // Enfocar este último
+      }
+  } else {
+      // Selección Única (Comportamiento clásico)
+      // Si el botón NO estaba seleccionado, limpiamos y seleccionamos solo este
+      // Si YA estaba en un grupo, no hacemos nada aún para permitir arrastrar el grupo
+      if (!selectedIds.includes(btn.id)) {
+          selectedIds = [btn.id];
+          openEditor(btn);
+      } else {
+          // Si ya estaba seleccionado, solo refrescamos el editor
+          openEditor(btn);
+      }
+  }
+
+  updateSelectionVisuals();
 
   isPotentialDrag = true; isDragging = false;
   dragStart = { x: e.clientX, y: e.clientY };
@@ -1320,7 +1415,12 @@ document.onmousemove = (e) => {
       const btnRect = btnEl.getBoundingClientRect();
       if (left < btnRect.right && left + width > btnRect.left && top < btnRect.bottom && top + height > btnRect.top) {
         if (!selectedIds.includes(btn.id)) selectedIds.push(btn.id);
-      } else { selectedIds = selectedIds.filter(id => id !== btn.id); }
+      } else { 
+          // Al arrastrar selección, respetamos Shift/Ctrl para no borrar selección previa
+          if (!e.shiftKey && !e.ctrlKey) {
+             selectedIds = selectedIds.filter(id => id !== btn.id);
+          }
+      }
     });
     updateSelectionVisuals();
   }
@@ -1329,6 +1429,8 @@ document.onmousemove = (e) => {
 function endDrag(e, btn) {
     if (isPotentialDrag) {
         if (!isDragging) {
+           // Fue solo un clic
+           // Ya manejamos la selección en startDrag, pero abrimos el editor aquí para asegurar fluidez
            openEditor(btn); 
         } else if (isDragging) { 
            saveToStorage(); 
@@ -1356,6 +1458,11 @@ document.onmouseup = () => {
   if (isSelecting) {
     isSelecting = false;
     document.getElementById('selectionBox').style.display = 'none';
+    if(selectedIds.length > 0) {
+        // Abrir editor tras terminar selección de cuadro
+        const lastId = selectedIds[selectedIds.length - 1];
+        openEditor(elements.find(b => b.id === lastId));
+    }
   }
 };
 
@@ -1376,6 +1483,7 @@ document.addEventListener('keydown', (e) => {
           comboLearningStep = 0;
           showToast("Cancelado");
       }
+      clearSelection(); // ESC limpia selección
       return; 
   }
   if (e.target.tagName === 'INPUT') return;
