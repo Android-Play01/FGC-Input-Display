@@ -522,10 +522,11 @@ const DIRECTIONS = [
 ];
 
 // DICCIONARIOS SEMÁNTICOS PARA SOCD
-const SEMANTIC_UP = ['UP', 'U', 'ARRIBA', 'NUM8', 'W', '↑', '↖', '↗'];
-const SEMANTIC_DOWN = ['DOWN', 'D', 'ABAJO', 'NUM2', 'S', '↓', '↙', '↘'];
-const SEMANTIC_LEFT = ['LEFT', 'L', 'IZQUIERDA', 'ATRAS', 'BACK', 'NUM4', 'A', '←', '↖', '↙'];
-const SEMANTIC_RIGHT = ['RIGHT', 'R', 'DERECHA', 'ADELANTE', 'FWD', 'NUM6', 'D', '→', '↗', '↘'];
+// IMPORTANTE: He eliminado 'W','A','S','D' y la tecla 'D' (conflicto con Down/Right) para evitar falsos positivos con ataques.
+const SEMANTIC_UP = ['UP', 'U', 'ARRIBA', 'NUM8', '↑', '↖', '↗', 'ARROWUP'];
+const SEMANTIC_DOWN = ['DOWN', 'ABAJO', 'NUM2', '↓', '↙', '↘', 'ARROWDOWN']; 
+const SEMANTIC_LEFT = ['LEFT', 'L', 'IZQUIERDA', 'ATRAS', 'BACK', 'NUM4', '←', '↖', '↙', 'ARROWLEFT'];
+const SEMANTIC_RIGHT = ['RIGHT', 'R', 'DERECHA', 'ADELANTE', 'FWD', 'NUM6', '→', '↗', '↘', 'ARROWRIGHT'];
 
 // NUEVO: Rastrear cuándo se activó cada input para ordenar cronológicamente
 let inputActivationTimes = {}; 
