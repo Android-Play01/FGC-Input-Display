@@ -17,7 +17,7 @@
     --text-main: #ffffff;
     --text-muted: #888899;
     --border-subtle: rgba(255,255,255,0.08);
-    --hover-bg: rgba(124, 77, 255, 0.1); /* Color del efecto hover */
+    --hover-bg: rgba(124, 77, 255, 0.1); 
   }
 
   body {
@@ -61,6 +61,9 @@
     box-shadow: 0 8px 25px rgba(0,0,0,0.7);
     backdrop-filter: blur(10px);
     z-index: 10;
+    background-size: 60%; /* Ajuste para iconos */
+    background-repeat: no-repeat;
+    background-position: center;
   }
   .input-btn:active { cursor: grabbing; }
   .input-btn.plain {
@@ -160,12 +163,11 @@
   }
   .btn-close-panel:hover { background: rgba(255,255,255,0.1); color: white; }
 
-  /* Área Scrollable del Panel */
   .panel-scroll {
     flex-grow: 1;
     overflow-y: auto;
     padding: 25px;
-    position: relative; /* Importante para el efecto hover */
+    position: relative; 
   }
 
   /* --- EFECTO HOVER SLIDE --- */
@@ -179,7 +181,7 @@
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* --- TARJETAS (CONTROL CARDS) --- */
+  /* --- TARJETAS --- */
   .control-card {
     background: var(--surface);
     border-radius: 12px;
@@ -188,12 +190,9 @@
     border: 1px solid var(--border-subtle);
     transition: border-color 0.2s;
     position: relative;
-    z-index: 10; /* Por encima del resplandor */
+    z-index: 10;
   }
-  /* Quitamos el box-shadow original para dejar que el glow resalte */
-  .control-card:hover {
-    border-color: rgba(255,255,255,0.15);
-  }
+  .control-card:hover { border-color: rgba(255,255,255,0.15); }
   .control-card h3 {
     margin: 0 0 15px 0;
     font-size: 13px;
@@ -207,6 +206,7 @@
   label { display: block; font-size: 13px; color: #ccc; margin-bottom: 6px; margin-top: 12px; }
   .control-card label:first-of-type { margin-top: 0; }
   .input-group { position: relative; margin-bottom: 10px; }
+  
   input[type="text"], input[type="number"], select {
     width: 100%;
     padding: 10px 0;
@@ -220,6 +220,24 @@
     box-sizing: border-box;
     transition: border-color 0.3s;
   }
+
+  /* 1. Mejora: Estilización de Selects */
+  select {
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 30px;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+  }
+  select option {
+    background: var(--panel-bg);
+    color: white;
+    padding: 10px;
+  }
+  
   input[type="text"]:focus, input[type="number"]:focus, select:focus {
     outline: none;
     border-bottom-color: var(--accent);
@@ -254,9 +272,9 @@
   .tab-btn { flex: 1; padding: 8px; background: transparent; color: #888; border: none; cursor: pointer; border-radius: 7px; font-size: 13px; font-weight: 600; transition: all 0.2s; }
   .tab-btn.active { background: #2a2a2a; color: white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
   
-  .flex-row { display: flex; gap: 10px; margin-top: 5px; }
-  .color-picker-wrapper { flex: 1; display: flex; align-items: center; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 4px; border-bottom: 1px solid transparent; }
-  input[type="color"] { width: 30px; height: 30px; border: none; padding: 0; background: none; cursor: pointer; margin-right: 8px; }
+  .flex-row { display: flex; gap: 10px; margin-top: 5px; align-items: flex-end; }
+  .color-picker-wrapper { display: flex; align-items: center; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 4px; border: 1px solid var(--border-subtle); height: 38px; box-sizing: border-box; }
+  input[type="color"] { width: 30px; height: 24px; border: none; padding: 0; background: none; cursor: pointer; border-radius: 4px; }
   
   .panel-page { display: none; animation: fadeIn 0.3s ease; }
   .panel-page.active { display: block; }
@@ -373,7 +391,6 @@
   </div>
 
   <div class="panel-scroll">
-    <!-- El "glow" se moverá entre cards en este contenedor -->
     <div id="glow-right" class="hover-glow"></div>
 
     <div class="tabs-container">
@@ -389,7 +406,13 @@
             <h3>Apariencia Global</h3>
             <div class="input-group">
                 <label>Fondo de Pantalla</label>
-                <input type="text" id="bgInput" value="transparent" placeholder="#000000 o URL">
+                <!-- 2. Mejora: Selector de Color para Fondo -->
+                <div class="flex-row">
+                    <div class="color-picker-wrapper">
+                        <input type="color" id="bgInputPicker" value="#050505" oninput="syncBgPicker(this.value)">
+                    </div>
+                    <input type="text" id="bgInput" value="transparent" placeholder="#000000 o URL" style="flex:2;" oninput="syncBgText(this.value)">
+                </div>
             </div>
             <div class="input-group">
                 <label>Estilo de Botones</label>
@@ -439,12 +462,12 @@
             <h3>Estilo del Viewer</h3>
             <label>Fondo</label>
             <div class="flex-row">
-                <div class="color-picker-wrapper"><input type="color" id="viewerBgColorPicker" value="#000000" oninput="updateViewerBg(this.value)"><span style="font-size:12px; color:#aaa;">Picker</span></div>
+                <div class="color-picker-wrapper"><input type="color" id="viewerBgColorPicker" value="#000000" oninput="updateViewerBg(this.value)"><span style="font-size:12px; color:#aaa; margin-left: 4px;">Picker</span></div>
                 <input type="text" id="viewerBgColorText" value="rgba(0,0,0,0.85)" oninput="updateViewerBg(this.value)" style="flex:2;">
             </div>
             <label style="margin-top:10px;">Borde Lateral</label>
             <div class="flex-row">
-                <div class="color-picker-wrapper"><input type="color" id="viewerBorderColorPicker" value="#7c4dff" oninput="updateBorderColor(this.value)"><span style="font-size:12px; color:#aaa;">Picker</span></div>
+                <div class="color-picker-wrapper"><input type="color" id="viewerBorderColorPicker" value="#7c4dff" oninput="updateBorderColor(this.value)"><span style="font-size:12px; color:#aaa; margin-left: 4px;">Picker</span></div>
                 <input type="text" id="viewerBorderColorText" value="#7c4dff" oninput="updateBorderColor(this.value)" style="flex:2;">
             </div>
         </div>
@@ -493,11 +516,15 @@
   </div>
 
   <div class="panel-scroll">
-    <!-- El "glow" se moverá entre cards en este contenedor -->
     <div id="glow-left" class="hover-glow"></div>
 
     <div class="control-card">
         <h3>Identificación</h3>
+        <!-- 3. Mejora: Campo URL Icono -->
+        <div class="input-group">
+            <label>URL del Icono (Opcional)</label>
+            <input type="text" id="editImage" placeholder="URL de imagen o icono..." oninput="updateCurrentButton()">
+        </div>
         <div class="input-group"><label>Texto Visible</label><input type="text" id="editText" placeholder="Ej: LP" oninput="updateCurrentButton()"></div>
         <div class="input-group"><label>Tecla Teclado</label><input type="text" id="editKey" placeholder="Pulsa una tecla..." oninput="updateCurrentButton()"></div>
     </div>
@@ -560,55 +587,38 @@ let isDraggingViewer = false;
 let viewerWasDragged = false; 
 let viewerDragStart = { x: 0, y: 0 };
 
-// --- INICIALIZACIÓN DE EFECTO HOVER ---
 function initHoverEffect() {
     const panels = [
         { panel: 'rightPanel', glowId: 'glow-right' },
         { panel: 'leftPanel', glowId: 'glow-left' }
     ];
-
     panels.forEach(({ panel, glowId }) => {
         const panelEl = document.getElementById(panel);
         const glow = document.getElementById(glowId);
         const scrollArea = panelEl.querySelector('.panel-scroll');
-
-        // Escuchar mousemove en el área de scroll para detectar cards
         scrollArea.addEventListener('mousemove', (e) => {
             const card = e.target.closest('.control-card');
             if (card) {
-                const rect = card.getBoundingClientRect();
-                const scrollRect = scrollArea.getBoundingClientRect();
-
-                // Calculamos posición relativa al contenedor scrollable
-                const top = card.offsetTop - 8; // Offset pequeño para el padding visual
+                const top = card.offsetTop - 8;
                 const left = card.offsetLeft - 8;
                 const width = card.offsetWidth + 16;
                 const height = card.offsetHeight + 16;
-
                 glow.style.top = `${top}px`;
                 glow.style.left = `${left}px`;
                 glow.style.width = `${width}px`;
                 glow.style.height = `${height}px`;
                 glow.style.opacity = '1';
-            } else {
-                // Si no está sobre una card pero si sobre el panel, mantenemos pero ocultamos si sale
-                // glow.style.opacity = '0';
             }
         });
-
-        scrollArea.addEventListener('mouseleave', () => {
-            glow.style.opacity = '0';
-        });
+        scrollArea.addEventListener('mouseleave', () => { glow.style.opacity = '0'; });
     });
 }
 
-// Iniciar efecto al cargar
 window.onload = () => {
     initHoverEffect();
     updateGlobalStatus();
 };
 
-// --- Gamepad & Input Loop ---
 window.addEventListener("gamepadconnected", (e) => { connectedGamepadIndex = e.gamepad.index; showToast(`Mando conectado: ${e.gamepad.id.substring(0, 20)}...`); updateGlobalStatus(); });
 window.addEventListener("gamepaddisconnected", (e) => { showToast("Mando desconectado"); connectedGamepadIndex = null; updateGlobalStatus(); });
 
@@ -648,7 +658,13 @@ function gamepadLoop() {
     elements.forEach(btn => {
         const el = document.querySelector(`[data-id="${btn.id}"]`);
         if(el) {
-            if (!frameActiveIds.has(btn.id)) { el.style.background = btn.colorInactive; el.classList.remove('active', 'effect-up', 'effect-down'); if (btn.style === 'plain') el.classList.add('plain'); } 
+            if (!frameActiveIds.has(btn.id)) { 
+                el.style.background = btn.colorInactive; 
+                el.classList.remove('active', 'effect-up', 'effect-down'); 
+                if (btn.style === 'plain') el.classList.add('plain');
+                // Re-aplicar imagen si existe
+                if(btn.image) el.style.backgroundImage = `url(${btn.image})`;
+            } 
             else { applyStyle(el, btn); }
         }
     });
@@ -663,7 +679,7 @@ function applySOCDCleaning(activeIds) {
     activeIds.forEach(id => {
         const btn = elements.find(b => b.id === id);
         if (btn) {
-            const txt = btn.text.toUpperCase(); const key = (btn.key || '').toUpperCase();
+            const txt = (btn.text || '').toUpperCase(); const key = (btn.key || '').toUpperCase();
             if (SEMANTIC_UP.includes(txt) || SEMANTIC_UP.includes(key)) hasUp = true;
             if (SEMANTIC_DOWN.includes(txt) || SEMANTIC_DOWN.includes(key)) hasDown = true;
             if (SEMANTIC_LEFT.includes(txt) || SEMANTIC_LEFT.includes(key)) hasLeft = true;
@@ -675,7 +691,7 @@ function applySOCDCleaning(activeIds) {
     const cleanedIds = new Set();
     activeIds.forEach(id => {
         const btn = elements.find(b => b.id === id); if (!btn) return;
-        const txt = btn.text.toUpperCase(); const key = (btn.key || '').toUpperCase();
+        const txt = (btn.text || '').toUpperCase(); const key = (btn.key || '').toUpperCase();
         let isDirty = false;
         if (cancelVertical) { if (SEMANTIC_UP.includes(txt) || SEMANTIC_UP.includes(key)) isDirty = true; if (SEMANTIC_DOWN.includes(txt) || SEMANTIC_DOWN.includes(key)) isDirty = true; }
         if (cancelHorizontal) { if (SEMANTIC_LEFT.includes(txt) || SEMANTIC_LEFT.includes(key)) isDirty = true; if (SEMANTIC_RIGHT.includes(txt) || SEMANTIC_RIGHT.includes(key)) isDirty = true; }
@@ -690,7 +706,7 @@ function processInputViewerFrame(activeIds) {
         const btn = elements.find(b => b.id === id);
         if(btn) {
             if (btn.macro && btn.macro.trim() !== '') { const targets = btn.macro.split(',').map(s => s.trim().toUpperCase()); rawInputs.push(...targets); } 
-            else { rawInputs.push(btn.text.toUpperCase()); }
+            else { rawInputs.push((btn.text || '').toUpperCase()); }
         }
     });
     rawInputs = [...new Set(rawInputs)];
@@ -757,7 +773,6 @@ function renderIconOrText(container, key) {
     else { const span = document.createElement('div'); span.className = 'fallback-icon'; span.innerText = key === 'N' ? '.' : key; container.appendChild(span); }
 }
 
-// --- PANELES ---
 function clickFab() { const panel = document.getElementById('rightPanel'); closeEditor(); if (panel.classList.contains('open')) { switchRightTab('general'); } else { panel.classList.add('open'); switchRightTab('general'); } }
 function closeRightPanel() { document.getElementById('rightPanel').classList.remove('open'); }
 function switchRightTab(tabName) {
@@ -766,7 +781,6 @@ function switchRightTab(tabName) {
     document.querySelectorAll('.panel-page').forEach(p => p.classList.remove('active'));
     document.getElementById('page-' + tabName).classList.add('active');
     if(tabName === 'viewer') { refreshAttackInputs(); renderCustomCombosList(); }
-    // Al cambiar de pestaña, ocultamos el glow para resetear posición
     document.getElementById('glow-right').style.opacity = '0';
 }
 function updateBorderColor(val) { viewerConfig.borderColor = val; document.getElementById('inputDisplayContainer').style.borderLeftColor = val; saveViewerConfig(); }
@@ -803,7 +817,20 @@ function renderCustomCombosList() {
 }
 function deleteCombo(index) { viewerConfig.customCombos.splice(index, 1); saveViewerConfig(); renderCustomCombosList(); }
 
-// --- EDITOR ---
+// 2. Mejora: Lógica Sincronización Fondo
+function syncBgPicker(val) {
+    document.getElementById('bgInput').value = val;
+    document.body.style.background = val;
+    saveToStorage();
+}
+function syncBgText(val) {
+    if (val.match(/^#[0-9A-F]{6}$/i)) {
+        document.getElementById('bgInputPicker').value = val;
+    }
+    document.body.style.background = val;
+    saveToStorage();
+}
+
 function openEditor(btn = null) {
   selectedBtn = btn; updateLearningButtonUI();
   document.querySelectorAll('.input-btn').forEach(el => el.classList.remove('editing'));
@@ -812,12 +839,18 @@ function openEditor(btn = null) {
   if (title) title.innerText = isMulti ? `Editar Selección (${selectedIds.length})` : 'Editar Botón';
   document.getElementById('leftPanel').classList.add('open'); closeRightPanel(); 
   document.getElementById('editText').disabled = isMulti; document.getElementById('editKey').disabled = isMulti; document.getElementById('editMacro').disabled = isMulti; document.getElementById('btnAssignGamepad').disabled = isMulti;
+  document.getElementById('editImage').disabled = isMulti;
   if (btn) {
     const el = document.querySelector(`[data-id="${btn.id}"]`); if(el) el.classList.add('editing');
-    document.getElementById('editText').value = btn.text || ''; document.getElementById('editKey').value = btn.key || '';
-    document.getElementById('editSize').value = btn.size || 80; document.getElementById('colorInactive').value = btn.colorInactive || '#1e1e32';
-    document.getElementById('colorActive').value = btn.colorActive || '#7c4dff'; document.getElementById('editStyle').value = btn.style || 'glass';
-    document.getElementById('editClickEffect').value = btn.clickEffect || 'down'; document.getElementById('editMacro').value = btn.macro || '';
+    document.getElementById('editImage').value = btn.image || '';
+    document.getElementById('editText').value = btn.text || ''; 
+    document.getElementById('editKey').value = btn.key || '';
+    document.getElementById('editSize').value = btn.size || 80; 
+    document.getElementById('colorInactive').value = btn.colorInactive || '#1e1e32';
+    document.getElementById('colorActive').value = btn.colorActive || '#7c4dff'; 
+    document.getElementById('editStyle').value = btn.style || 'glass';
+    document.getElementById('editClickEffect').value = btn.clickEffect || 'down'; 
+    document.getElementById('editMacro').value = btn.macro || '';
     updateGamepadStatusText(btn.gamepadMap);
   }
 }
@@ -825,7 +858,7 @@ function closeEditor() { document.getElementById('leftPanel').classList.remove('
 
 function addNewButton() {
   const size = 90;
-  const newBtn = { id: Date.now(), x: innerWidth/2 - size/2, y: innerHeight/2 - size/2, size: size, text: 'LP', key: '', colorInactive: '#1e1e32', colorActive: '#7c4dff', style: 'glass', clickEffect: 'down', macro: '', gamepadMap: null };
+  const newBtn = { id: Date.now(), x: innerWidth/2 - size/2, y: innerHeight/2 - size/2, size: size, text: 'LP', key: '', colorInactive: '#1e1e32', colorActive: '#7c4dff', style: 'glass', clickEffect: 'down', macro: '', gamepadMap: null, image: '' };
   elements.push(newBtn); renderButton(newBtn); clearSelection(); selectedIds = [newBtn.id]; updateSelectionVisuals(); openEditor(newBtn); saveToStorage();
 }
 
@@ -839,10 +872,16 @@ function updateCurrentButton() {
   const text = document.getElementById('editText').value;
   const key = document.getElementById('editKey').value.toLowerCase();
   const macro = document.getElementById('editMacro').value;
+  const imgUrl = document.getElementById('editImage').value;
   const isMulti = selectedIds.length > 1;
   selectedIds.forEach(id => {
       const btn = elements.find(b => b.id === id);
-      if(btn) { btn.size = size; btn.colorInactive = colorInactive; btn.colorActive = colorActive; btn.style = style; btn.clickEffect = clickEffect; if (!isMulti) { btn.text = text; btn.key = key; btn.macro = macro; } updateButtonVisual(btn); }
+      if(btn) { 
+          btn.size = size; btn.colorInactive = colorInactive; btn.colorActive = colorActive; 
+          btn.style = style; btn.clickEffect = clickEffect; 
+          if (!isMulti) { btn.text = text; btn.key = key; btn.macro = macro; btn.image = imgUrl; } 
+          updateButtonVisual(btn); 
+      }
   });
   refreshAttackInputs(); saveToStorage();
 }
@@ -854,29 +893,45 @@ function updateLearningButtonUI() { const btn = document.getElementById('btnAssi
 function updateGamepadStatusText(map) { const txt = document.getElementById('gamepadStatusText'); if (!map) { txt.textContent = "Ninguno asignado"; txt.style.color = "#aaa"; } else { txt.innerHTML = map.type === 'button' ? `🎮 Botón <b style="color:#fff">${map.index}</b>` : `🕹️ Eje <b style="color:#fff">${map.index}</b> [${map.value > 0 ? '+' : '-'}]`; txt.style.color = "#ccc"; } }
 
 function renderButton(btn) {
-  const el = document.createElement('div'); el.className = 'input-btn'; el.dataset.id = btn.id; el.textContent = btn.text || ''; 
+  const el = document.createElement('div'); el.className = 'input-btn'; el.dataset.id = btn.id; el.textContent = btn.image ? '' : (btn.text || ''); 
   const closeBadge = document.createElement('div'); closeBadge.className = 'delete-badge'; closeBadge.innerHTML = '×'; closeBadge.onmousedown = (e) => e.stopPropagation(); closeBadge.onclick = (e) => { e.stopPropagation(); deleteButton(btn.id); };
-  el.appendChild(closeBadge); applyStyle(el, btn); el.style.width = el.style.height = btn.size + 'px'; el.style.left = btn.x + 'px'; el.style.top = btn.y + 'px';
+  el.appendChild(closeBadge); 
+  applyStyle(el, btn); 
+  el.style.width = el.style.height = btn.size + 'px'; el.style.left = btn.x + 'px'; el.style.top = btn.y + 'px';
   el.onmousedown = (e) => startDrag(e, btn); el.onmouseup = (e) => endDrag(e, btn);
   document.getElementById('canvas').appendChild(el);
 }
 
 function updateButtonVisual(btn) {
   const el = document.querySelector(`[data-id="${btn.id}"]`); if (!el) return;
-  const badge = el.querySelector('.delete-badge'); el.textContent = btn.text || ''; if(badge) el.appendChild(badge);
-  el.style.width = el.style.height = btn.size + 'px'; el.style.left = btn.x + 'px'; el.style.top = btn.y + 'px'; applyStyle(el, btn);
+  const badge = el.querySelector('.delete-badge'); 
+  // 3. Mejora: Lógica Renderizado Imagen
+  el.textContent = btn.image ? '' : (btn.text || ''); 
+  if(badge) el.appendChild(badge);
+  el.style.width = el.style.height = btn.size + 'px'; el.style.left = btn.x + 'px'; el.style.top = btn.y + 'px'; 
+  applyStyle(el, btn);
 }
 
 function applyStyle(el, btn) {
   const isPressed = activeKeys.has(btn.key) || activeGamepadInputs.has(btn.id);
   if (isPressed) { el.style.background = btn.colorActive; el.classList.add('active'); } else { el.style.background = btn.colorInactive; el.classList.remove('active'); }
   el.style.borderColor = btn.colorActive + '88';
+  
+  // Aplicar imagen de fondo si existe
+  if(btn.image) {
+    el.style.backgroundImage = `url(${btn.image})`;
+    el.style.backgroundSize = 'contain';
+    el.style.backgroundRepeat = 'no-repeat';
+    el.style.backgroundPosition = 'center';
+  } else {
+    el.style.backgroundImage = 'none';
+  }
+
   if (btn.style === 'plain') el.classList.add('plain'); else el.classList.remove('plain');
   el.classList.remove('effect-up', 'effect-down'); el.classList.add(btn.clickEffect === 'up' ? 'effect-up' : 'effect-down');
   if (selectedIds.includes(btn.id)) el.classList.add('selected-multi'); else el.classList.remove('selected-multi');
 }
 
-// --- Drag & Select ---
 function startDrag(e, btn) {
   if (e.button !== 0) return; e.stopPropagation();
   if (isComboLearning) { handleComboSelection(btn); return; }
@@ -926,7 +981,6 @@ document.addEventListener('keyup', (e) => { const k = e.key.toLowerCase(); if (a
 
 function deleteButton(id) { elements = elements.filter(b => b.id !== id); selectedIds = selectedIds.filter(sid => sid !== id); document.querySelector(`[data-id="${id}"]`)?.remove(); if (selectedBtn && selectedBtn.id === id) closeEditor(); saveToStorage(); }
 
-document.getElementById('bgInput').oninput = (e) => { document.body.style.background = e.target.value.trim() === 'transparent' ? 'transparent' : e.target.value.trim(); saveToStorage(); };
 function applyGlobalStyle() { const style = document.getElementById('globalStyle').value; elements.forEach(btn => { btn.style = style; const el = document.querySelector(`[data-id="${btn.id}"]`); if (el) applyStyle(el, btn); }); saveToStorage(); }
 function saveSOCDConfig() { socdEnabled = document.getElementById('socdToggle').checked; saveToStorage(); }
 
@@ -943,7 +997,7 @@ function loadViewerConfig(configOverride = null) {
 function resetViewerPos() { const el = document.getElementById('inputDisplayContainer'); el.style.left = '50px'; el.style.top = '230px'; viewerConfig.x = 50; viewerConfig.y = 230; saveViewerConfig(); }
 function refreshAttackInputs() {
     const container = document.getElementById('attackUrlContainer'); container.innerHTML = ''; const uniqueTexts = new Set();
-    elements.forEach(btn => { const t = btn.text.toUpperCase(); if(t !== 'N' && t.length > 0) uniqueTexts.add(t); });
+    elements.forEach(btn => { const t = (btn.text || '').toUpperCase(); if(t !== 'N' && t.length > 0) uniqueTexts.add(t); });
     uniqueTexts.forEach(txt => {
         const wrap = document.createElement('div'); wrap.style.marginTop = '10px'; wrap.className = 'input-group';
         const label = document.createElement('label'); label.innerText = `Icono para "${txt}"`;
@@ -966,9 +1020,9 @@ document.getElementById('importInput').addEventListener('keydown', function(e) {
   }
 });
 function exportConfig() { const data = { bg: document.body.style.background, elements, viewerConfig: viewerConfig, socdEnabled: socdEnabled }; copyTextToClipboard(JSON.stringify(data), '✅ Configuración copiada', '¡Copiado (fallback)!'); }
-function clearAll() { showToast('⚠️ Pulsa otra vez en 3s para borrar TODO.'); if (window.clearAllConfirmed) { elements = []; document.getElementById('canvas').innerHTML = ''; localStorage.removeItem('fgcInputDisplayV2'); localStorage.removeItem('fgcViewerConfig'); viewerConfig.urls = { N:'' }; viewerConfig.customCombos = []; socdEnabled = false; document.getElementById('socdToggle').checked = false; closeEditor(); window.clearAllConfirmed = false; showToast('🗑️ ¡Borrado completo!'); resetViewerPos(); loadViewerConfig(); } else { window.clearAllConfirmed = true; setTimeout(() => window.clearAllConfirmed = false, 3000); } }
+function clearAll() { showToast('⚠️ Pulsa otra vez para borrar TODO.'); if (window.clearAllConfirmed) { elements = []; document.getElementById('canvas').innerHTML = ''; localStorage.removeItem('fgcInputDisplayV2'); localStorage.removeItem('fgcViewerConfig'); viewerConfig.urls = { N:'' }; viewerConfig.customCombos = []; socdEnabled = false; document.getElementById('socdToggle').checked = false; closeEditor(); window.clearAllConfirmed = false; showToast('🗑️ ¡Borrado completo!'); resetViewerPos(); loadViewerConfig(); } else { window.clearAllConfirmed = true; setTimeout(() => window.clearAllConfirmed = false, 3000); } }
 function saveToStorage() { const data = { bg: document.body.style.background, elements, socdEnabled: socdEnabled }; localStorage.setItem('fgcInputDisplayV2', JSON.stringify(data)); }
-function loadFromStorage() { const str = localStorage.getItem('fgcInputDisplayV2'); if (!str) return; try { const data = JSON.parse(str); document.body.style.background = data.bg || 'transparent'; document.getElementById('bgInput').value = data.bg || 'transparent'; elements = data.elements || []; elements.forEach(renderButton); socdEnabled = data.socdEnabled || false; const socdToggle = document.getElementById('socdToggle'); if(socdToggle) socdToggle.checked = socdEnabled; } catch(e) {} }
+function loadFromStorage() { const str = localStorage.getItem('fgcInputDisplayV2'); if (!str) return; try { const data = JSON.parse(str); document.body.style.background = data.bg || 'transparent'; document.getElementById('bgInput').value = data.bg || 'transparent'; if(data.bg && data.bg.match(/^#[0-9A-F]{6}$/i)) document.getElementById('bgInputPicker').value = data.bg; elements = data.elements || []; elements.forEach(renderButton); socdEnabled = data.socdEnabled || false; const socdToggle = document.getElementById('socdToggle'); if(socdToggle) socdToggle.checked = socdEnabled; } catch(e) {} }
 
 loadFromStorage();
 loadViewerConfig();
